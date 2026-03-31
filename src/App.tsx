@@ -39,7 +39,7 @@ const DEFAULT_CONFIG: TTSConfig = {
 };
 
 const PRESET_VOICES = [
-  { id: 'vivian', label: 'Vivian (温柔女声)' },
+  { id: 'vivian', label: 'Vivian (普通女声)' },
   { id: 'serena', label: 'Serena (活泼女声)' },
   { id: 'uncle_fu', label: 'Uncle_Fu (醇厚大叔)' },
   { id: 'dylan', label: 'Dylan (北京男声)' },
@@ -100,7 +100,7 @@ export default function App() {
         }
       }
     };
-    
+
     loadData();
   }, []);
 
@@ -366,8 +366,8 @@ export default function App() {
                         </span>
                         <span className="text-[10px] font-mono text-[#5A5B5F] uppercase flex items-center gap-1 shrink-0">
                           <Type className="w-3 h-3" />
-                          音色: {PRESET_VOICES.find(v => v.id === item.voice)?.label || item.voice.toUpperCase()} 
-                          &nbsp;• 语速: {item.speed}x 
+                          音色: {PRESET_VOICES.find(v => v.id === item.voice)?.label || item.voice.toUpperCase()}
+                          &nbsp;• 语速: {item.speed}x
                         </span>
                         <span className="text-[10px] font-mono text-[#5A5B5F] uppercase flex items-center shrink-0">
                           • 种子: <span className="text-[#8E9299] ml-1 select-all">{item.seed === -1 ? '随机' : item.seed}</span>
@@ -517,7 +517,7 @@ export default function App() {
                     </button>
                   )}
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-2">
                   {EMOTION_PRESETS.map((preset) => (
                     <button
@@ -628,7 +628,7 @@ export default function App() {
 
               {/* API Info Settings */}
               <div className="pt-8 border-t border-[#2A2B2F] space-y-4">
-                <button 
+                <button
                   onClick={() => setIsApiConfigOpen(!isApiConfigOpen)}
                   className="w-full flex items-center justify-between mb-2 group"
                 >
@@ -643,7 +643,7 @@ export default function App() {
                 </button>
 
                 {isApiConfigOpen && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
