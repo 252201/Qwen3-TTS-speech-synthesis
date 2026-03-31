@@ -1,0 +1,5 @@
+{
+  "name": "Qwen3 语音合成工作室",
+  "description": "专为 Qwen3-TTS-12Hz-1.7B-Base-8bit 模型设计的专业语音合成网页客户端。",
+  "requestFramePermissions": []
+}
