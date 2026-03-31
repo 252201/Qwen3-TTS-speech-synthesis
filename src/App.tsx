@@ -26,6 +26,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { TTSHistoryItem, TTSConfig } from './types';
 import { format } from 'date-fns';
+import { saveAudio, getAudio, deleteAudio } from './lib/db';
 
 const DEFAULT_CONFIG: TTSConfig = {
   apiKey: import.meta.env.VITE_TTS_API_KEY || 'omlx-mpi54dic99snaxxp',
@@ -71,24 +72,36 @@ export default function App() {
 
   // Load history and config from localStorage
   useEffect(() => {
-    const savedHistory = localStorage.getItem('tts_history');
-    if (savedHistory) {
-      try {
-        setHistory(JSON.parse(savedHistory));
-      } catch (e) {
-        console.error('Failed to parse history', e);
+    const loadData = async () => {
+      const savedHistory = localStorage.getItem('tts_history');
+      if (savedHistory) {
+        try {
+          const parsed: TTSHistoryItem[] = JSON.parse(savedHistory);
+          const hydrated = await Promise.all(parsed.map(async (item) => {
+            const blob = await getAudio(item.id);
+            if (blob) {
+              return { ...item, audioUrl: URL.createObjectURL(blob) };
+            }
+            return null; // Ignore items without audio data
+          }));
+          setHistory(hydrated.filter(item => item !== null) as TTSHistoryItem[]);
+        } catch (e) {
+          console.error('Failed to parse history', e);
+        }
       }
-    }
 
-    const savedConfig = localStorage.getItem('tts_config');
-    if (savedConfig) {
-      try {
-        const parsed = JSON.parse(savedConfig);
-        setConfig(prev => ({ ...prev, ...parsed }));
-      } catch (e) {
-        console.error('Failed to parse config', e);
+      const savedConfig = localStorage.getItem('tts_config');
+      if (savedConfig) {
+        try {
+          const parsed = JSON.parse(savedConfig);
+          setConfig(prev => ({ ...prev, ...parsed }));
+        } catch (e) {
+          console.error('Failed to parse config', e);
+        }
       }
-    }
+    };
+    
+    loadData();
   }, []);
 
   // Save history to localStorage
@@ -172,10 +185,12 @@ export default function App() {
       }
 
       const blob = await response.blob();
+      const newItemId = crypto.randomUUID();
+      await saveAudio(newItemId, blob);
       const audioUrl = URL.createObjectURL(blob);
 
       const newItem: TTSHistoryItem = {
-        id: crypto.randomUUID(),
+        id: newItemId,
         text: text,
         timestamp: Date.now(),
         audioUrl: audioUrl,
@@ -223,7 +238,12 @@ export default function App() {
     document.body.removeChild(a);
   };
 
-  const deleteHistoryItem = (id: string) => {
+  const deleteHistoryItem = async (id: string) => {
+    try {
+      await deleteAudio(id);
+    } catch (e) {
+      console.error('Failed to delete audio payload', e);
+    }
     setHistory(prev => {
       const item = prev.find(i => i.id === id);
       if (item) URL.revokeObjectURL(item.audioUrl);
