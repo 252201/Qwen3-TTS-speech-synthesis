@@ -27,6 +27,7 @@ import { cn } from './lib/utils';
 import { TTSHistoryItem, TTSConfig } from './types';
 import { format } from 'date-fns';
 import { saveAudio, getAudio, deleteAudio } from './lib/db';
+import { convertToWav } from './lib/audioUtils';
 
 const DEFAULT_CONFIG: TTSConfig = {
   apiKey: import.meta.env.VITE_TTS_API_KEY || 'omlx-mpi54dic99snaxxp',
@@ -111,11 +112,11 @@ export default function App() {
 
   // Save config to localStorage (excluding reference audio large base64 buffers to save space)
   useEffect(() => {
-    const { referenceAudio, referenceAudioRaw, ...saveableConfig } = config;
+    const { referenceAudio, referenceAudioRaw, referenceText, ...saveableConfig } = config;
     localStorage.setItem('tts_config', JSON.stringify(saveableConfig));
   }, [config]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -124,24 +125,30 @@ export default function App() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
+    try {
+      // Convert any audio format to WAV (omlx voice cloning requires WAV)
+      const { wavBlob, rawBase64 } = await convertToWav(file);
+      const previewUrl = URL.createObjectURL(wavBlob);
       setConfig(prev => ({
         ...prev,
-        referenceAudio: base64,
+        referenceAudio: previewUrl, // For local preview
+        referenceAudioRaw: rawBase64, // Pure base64 WAV for ref_audio field
         referenceAudioName: file.name,
         voice: 'custom' // Switch to custom voice mode
       }));
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Audio conversion failed:', err);
+      alert('音频文件解码失败，请尝试使用 WAV 格式的音频文件。');
+    }
   };
 
   const clearReferenceAudio = () => {
     setConfig(prev => ({
       ...prev,
       referenceAudio: undefined,
+      referenceAudioRaw: undefined,
       referenceAudioName: undefined,
+      referenceText: undefined,
       voice: 'alloy'
     }));
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -150,18 +157,30 @@ export default function App() {
   const handleGenerate = async () => {
     if (!text.trim() || isGenerating) return;
 
+    // Validate ref_text is provided when voice cloning is active
+    if (config.voice === 'custom' && config.referenceAudioRaw && !config.referenceText?.trim()) {
+      alert('语音克隆需要填写「参考音频文本」，请在右侧输入参考音频中说的话。');
+      return;
+    }
+
     setIsGenerating(true);
     try {
       // Prepare request body
       const body: any = {
         model: config.modelId,
         input: text,
-        voice: config.voice === 'custom' ? config.referenceAudio : config.voice,
+        voice: config.voice === 'custom' ? 'alloy' : config.voice,
         speed: config.speed,
         seed: config.seed,
         instruct: config.instruct,
         response_format: config.responseFormat
       };
+
+      // Voice cloning: use ref_audio + ref_text (omlx v0.3.5 API)
+      if (config.voice === 'custom' && config.referenceAudioRaw) {
+        body.ref_audio = config.referenceAudioRaw;
+        body.ref_text = config.referenceText || '';
+      }
 
       const response = await fetch(config.apiHost, {
         method: 'POST',
@@ -450,8 +469,22 @@ export default function App() {
                         <X className="w-4 h-4" />
                       </button>
                     </div>
+
+                    {/* ref_text input — required by omlx v0.3.5 */}
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono text-[#8E9299] uppercase tracking-wider">
+                        参考音频文本 (ref_text) <span className="text-[#F27D26]">*必填</span>
+                      </label>
+                      <textarea
+                        value={config.referenceText || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, referenceText: e.target.value }))}
+                        placeholder="请输入参考音频中说的话（需准确匹配，否则克隆效果会变差）"
+                        className="w-full h-16 bg-[#151619] border border-[#2A2B2F] rounded-lg px-2 py-1.5 text-[10px] font-mono focus:outline-none focus:border-[#F27D26] transition-colors text-[#E0E0E0] placeholder:text-[#3A3B3F] resize-none"
+                      />
+                    </div>
+
                     <p className="text-[9px] text-[#5A5B5F] leading-tight">
-                      已启用克隆模式。生成时将使用此参考音频的音色。
+                      已启用克隆模式。请务必准确填写参考音频中的文本内容。
                     </p>
                   </div>
                 ) : (

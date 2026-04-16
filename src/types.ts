@@ -20,6 +20,8 @@ export interface TTSConfig {
   seed: number;
   instruct?: string;
   responseFormat: string;
-  referenceAudio?: string; // Base64 encoded audio
+  referenceAudio?: string; // Base64 Data URL for local preview
+  referenceAudioRaw?: string; // Pure base64 string (no data: prefix) for API
   referenceAudioName?: string;
+  referenceText?: string; // Transcript of reference audio (required by omlx v0.3.5)
 }
