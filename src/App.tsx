@@ -27,7 +27,7 @@ import { cn } from './lib/utils';
 import { TTSHistoryItem, TTSConfig } from './types';
 import { format } from 'date-fns';
 import { saveAudio, getAudio, deleteAudio } from './lib/db';
-import { convertToWav } from './lib/audioUtils';
+import { convertToWav, applyGain } from './lib/audioUtils';
 
 const DEFAULT_CONFIG: TTSConfig = {
   apiKey: import.meta.env.VITE_TTS_API_KEY || 'omlx-mpi54dic99snaxxp',
@@ -36,7 +36,8 @@ const DEFAULT_CONFIG: TTSConfig = {
   voice: 'vivian',
   speed: 1.0,
   seed: 42,
-  responseFormat: 'mp3'
+  responseFormat: 'mp3',
+  gain: 1.0
 };
 
 const PRESET_VOICES = [
@@ -208,7 +209,9 @@ export default function App() {
         throw new Error(errorMessage);
       }
 
-      const blob = await response.blob();
+      const rawBlob = await response.blob();
+      // Apply gain (volume adjustment) to the generated audio data
+      const blob = await applyGain(rawBlob, config.gain);
       const newItemId = crypto.randomUUID();
       await saveAudio(newItemId, blob);
       const audioUrl = URL.createObjectURL(blob);
@@ -607,6 +610,30 @@ export default function App() {
                 <div className="flex justify-between text-[10px] font-mono text-[#3A3B3F]">
                   <span>0.25x</span>
                   <span>4.0x</span>
+                </div>
+              </div>
+
+              {/* Gain (Output Volume) Slider */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-mono text-[#5A5B5F] uppercase tracking-[0.2em]">
+                    生成音量 (Gain)
+                  </label>
+                  <span className="text-xs font-mono text-[#F27D26]">{config.gain.toFixed(1)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.25"
+                  max="3.0"
+                  step="0.25"
+                  value={config.gain}
+                  onChange={(e) => setConfig(prev => ({ ...prev, gain: parseFloat(e.target.value) }))}
+                  className="w-full h-1 bg-[#2A2B2F] rounded-lg appearance-none cursor-pointer accent-[#F27D26]"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-[#3A3B3F]">
+                  <span>0.25x 弱</span>
+                  <span>1.0x 原始</span>
+                  <span>3.0x 强</span>
                 </div>
               </div>
 
