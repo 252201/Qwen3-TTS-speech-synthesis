@@ -83,3 +83,39 @@ async function blobToBase64Raw(blob: Blob): Promise<string> {
     reader.readAsDataURL(blob);
   });
 }
+
+/**
+ * Apply gain (volume adjustment) to an audio blob by decoding, scaling PCM samples, and re-encoding as WAV.
+ * gain: 0.25 = very quiet, 1.0 = unchanged, 3.0 = very loud
+ */
+export async function applyGain(audioBlob: Blob, gain: number): Promise<Blob> {
+  if (gain === 1.0) return audioBlob; // No processing needed
+
+  const arrayBuffer = await audioBlob.arrayBuffer();
+  const audioCtx = new AudioContext();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  await audioCtx.close();
+
+  // Apply gain to each channel's PCM data
+  const numChannels = audioBuffer.numberOfChannels;
+  const sampleRate = audioBuffer.sampleRate;
+  const numSamples = audioBuffer.length;
+
+  // Mix to mono and apply gain
+  const mono = new Float32Array(numSamples);
+  for (let ch = 0; ch < numChannels; ch++) {
+    const channelData = audioBuffer.getChannelData(ch);
+    for (let i = 0; i < numSamples; i++) {
+      mono[i] += (channelData[i] * gain) / numChannels;
+    }
+  }
+
+  // Clamp to [-1, 1]
+  for (let i = 0; i < numSamples; i++) {
+    mono[i] = Math.max(-1, Math.min(1, mono[i]));
+  }
+
+  // Re-encode as WAV
+  const wavBuffer = encodeWav(mono, sampleRate);
+  return new Blob([wavBuffer], { type: 'audio/wav' });
+}
