@@ -71,9 +71,23 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const configLoaded = useRef(false);
+
   // Load history and config from localStorage
   useEffect(() => {
-    const loadData = async () => {
+    // Read config SYNCHRONOUSLY before any async work to prevent save effect from overwriting
+    const savedConfig = localStorage.getItem('tts_config');
+    if (savedConfig) {
+      try {
+        const parsed = JSON.parse(savedConfig);
+        setConfig(prev => ({ ...prev, ...parsed }));
+      } catch (e) {
+        console.error('Failed to parse config', e);
+      }
+    }
+    configLoaded.current = true;
+
+    const loadHistory = async () => {
       const savedHistory = localStorage.getItem('tts_history');
       if (savedHistory) {
         try {
@@ -90,19 +104,9 @@ export default function App() {
           console.error('Failed to parse history', e);
         }
       }
-
-      const savedConfig = localStorage.getItem('tts_config');
-      if (savedConfig) {
-        try {
-          const parsed = JSON.parse(savedConfig);
-          setConfig(prev => ({ ...prev, ...parsed }));
-        } catch (e) {
-          console.error('Failed to parse config', e);
-        }
-      }
     };
 
-    loadData();
+    loadHistory();
   }, []);
 
   // Save history to localStorage
@@ -112,6 +116,7 @@ export default function App() {
 
   // Save config to localStorage (excluding reference audio large base64 buffers to save space)
   useEffect(() => {
+    if (!configLoaded.current) return; // Skip save until initial load is done
     const { referenceAudio, referenceAudioRaw, referenceText, ...saveableConfig } = config;
     localStorage.setItem('tts_config', JSON.stringify(saveableConfig));
   }, [config]);
