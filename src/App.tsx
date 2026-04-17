@@ -6,8 +6,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AudioLines,
-  ChevronDown,
-  ChevronRight,
   Clock,
   Download,
   History,
@@ -99,7 +97,6 @@ export default function App() {
   const [availableModelIds, setAvailableModelIds] = useState<string[]>([]);
   const [currentAudio, setCurrentAudio] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isApiConfigOpen, setIsApiConfigOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const configLoaded = useRef(false);
@@ -428,10 +425,6 @@ export default function App() {
   const isCurrentCompatHost = /api\.252202\.xyz/i.test(config.apiHost);
   const seedIsExperimental = isCurrentCompatHost;
   const referenceTextRequired = isCloneMode && isCurrentCompatHost;
-  const activeModelPresets = MODEL_PRESETS.map((preset) => ({
-    ...preset,
-    isAvailable: availableModelIds.length === 0 || availableModelIds.includes(preset.id)
-  }));
   const cardClass =
     'rounded-[28px] border border-white/10 bg-white/6 shadow-[0_24px_80px_rgba(8,10,20,0.45)] backdrop-blur-xl';
 
@@ -1013,89 +1006,6 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="border-t border-white/10 pt-2">
-                  <button
-                    onClick={() => setIsApiConfigOpen(prev => !prev)}
-                    className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-left transition hover:border-white/20"
-                  >
-                    <div>
-                      <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">Engine Config</div>
-                      <div className="mt-1 text-sm font-medium text-white">API 配置与模型切换</div>
-                    </div>
-                    {isApiConfigOpen ? (
-                      <ChevronDown className="h-4.5 w-4.5 text-[var(--soft)]" />
-                    ) : (
-                      <ChevronRight className="h-4.5 w-4.5 text-[var(--soft)]" />
-                    )}
-                  </button>
-
-                  <AnimatePresence initial={false}>
-                    {isApiConfigOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="mt-4 space-y-4 rounded-[24px] border border-white/10 bg-black/20 p-4">
-                          <div className="space-y-2">
-                            <label className="text-[11px] font-mono uppercase tracking-[0.24em] text-[var(--muted)]">接口地址</label>
-                            <input
-                              type="text"
-                              value={config.apiHost}
-                              onChange={(e) => setConfig(prev => ({ ...prev, apiHost: e.target.value }))}
-                              placeholder="https://api.example.com/v1/audio/speech"
-                              className="w-full rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white outline-none transition focus:border-[var(--line-strong)] placeholder:text-[var(--muted)]"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-[11px] font-mono uppercase tracking-[0.24em] text-[var(--muted)]">模型 ID</label>
-                            <input
-                              type="text"
-                              value={config.modelId}
-                              onChange={(e) => setConfig(prev => ({ ...prev, modelId: e.target.value }))}
-                              placeholder="Qwen3-TTS..."
-                              className="w-full rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white outline-none transition focus:border-[var(--line-strong)] placeholder:text-[var(--muted)]"
-                            />
-                            <div className="grid gap-2">
-                              {activeModelPresets.map((preset) => (
-                                <button
-                                  key={preset.id}
-                                  disabled={!preset.isAvailable}
-                                  onClick={() => setConfig(prev => ({ ...prev, modelId: preset.id }))}
-                                  className={cn(
-                                    'rounded-2xl border px-3 py-3 text-left transition',
-                                    !preset.isAvailable && 'cursor-not-allowed opacity-40',
-                                    config.modelId === preset.id
-                                      ? 'border-[var(--line-strong)] bg-[var(--panel-2)] text-white'
-                                      : 'border-white/10 bg-white/5 text-[var(--soft)] hover:border-white/20 hover:text-white'
-                                  )}
-                                >
-                                  <div className="text-sm font-medium">{preset.label}</div>
-                                  <div className="mt-1 text-xs text-[var(--muted)]">
-                                    {preset.isAvailable ? preset.note : '当前接口不可用'}
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-[11px] font-mono uppercase tracking-[0.24em] text-[var(--muted)]">API 密钥</label>
-                            <input
-                              type="password"
-                              value={config.apiKey}
-                              onChange={(e) => setConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                              placeholder="sk-..."
-                              className="w-full rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white outline-none transition focus:border-[var(--line-strong)] placeholder:text-[var(--muted)]"
-                            />
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
               </div>
             </section>
           </aside>
