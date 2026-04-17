@@ -300,6 +300,16 @@ export default function App() {
   const handleGenerate = async () => {
     if (!text.trim() || isGenerating) return;
 
+    const requiresReferenceText =
+      config.voice === 'custom' &&
+      !!config.referenceAudioRaw &&
+      /api\.252202\.xyz/i.test(config.apiHost);
+
+    if (requiresReferenceText && !config.referenceText?.trim()) {
+      alert('当前接口要求填写参考音频文本（ref_text），请填写参考音频中实际说的内容。');
+      return;
+    }
+
     setIsGenerating(true);
     try {
       const body: any = {
@@ -420,6 +430,7 @@ export default function App() {
   const isPresetEmotionMode = !isCloneMode && !!config.instruct?.trim();
   const presetVoiceMayDrift = isCurrentCompatHost && !isCloneMode;
   const seedIsExperimental = isCurrentCompatHost;
+  const referenceTextRequired = isCloneMode && isCurrentCompatHost;
   const activeModelPresets = MODEL_PRESETS.map((preset) => ({
     ...preset,
     isAvailable: availableModelIds.length === 0 || availableModelIds.includes(preset.id)
@@ -852,16 +863,25 @@ export default function App() {
 
                       <div className="space-y-2">
                         <label className="text-[11px] font-mono uppercase tracking-[0.24em] text-[var(--muted)]">
-                          参考音频文本 <span className="text-[var(--accent)]">建议填写</span>
+                          参考音频文本{' '}
+                          <span className="text-[var(--accent)]">
+                            {referenceTextRequired ? '当前接口必填' : '建议填写'}
+                          </span>
                         </label>
                         <textarea
                           value={config.referenceText || ''}
                           onChange={(e) => setConfig(prev => ({ ...prev, referenceText: e.target.value }))}
-                          placeholder="建议准确填写参考音频里说的内容；不填也可尝试，但稳定性和相似度通常会更差。"
+                          placeholder={
+                            referenceTextRequired
+                              ? '当前接口要求填写参考音频里实际说的内容，否则服务端会直接报错。'
+                              : '建议准确填写参考音频里说的内容；不填也可尝试，但稳定性和相似度通常会更差。'
+                          }
                           className="h-24 w-full resize-none rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm leading-6 text-white outline-none transition focus:border-[var(--line-strong)] placeholder:text-[var(--muted)]"
                         />
                         <p className="text-xs leading-6 text-[var(--soft)]">
-                          官方文档里克隆音色的文本字段是可选的；但在实际兼容接口中，补上原文通常更稳定，也更容易保住同一个人。
+                          {referenceTextRequired
+                            ? '你现在使用的兼容接口会强制要求 ref_text，所以这里必须填写；而且写得越准确，克隆越稳定。'
+                            : '官方文档里克隆音色的文本字段是可选的；但在实际兼容接口中，补上原文通常更稳定，也更容易保住同一个人。'}
                         </p>
                       </div>
                     </div>
