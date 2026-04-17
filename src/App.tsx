@@ -87,16 +87,6 @@ function getModelsEndpoint(apiHost: string) {
   }
 }
 
-const TRAILING_PAUSE_INSTRUCTION =
-  'After speaking the final word, remain completely silent for about one second before ending the audio. Do not add any extra words or sounds.';
-
-function buildApiInstruct(instruct?: string) {
-  const trimmed = instruct?.trim();
-  return trimmed
-    ? `${trimmed} ${TRAILING_PAUSE_INSTRUCTION}`
-    : TRAILING_PAUSE_INSTRUCTION;
-}
-
 export default function App() {
   const [text, setText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -317,14 +307,13 @@ export default function App() {
 
     setIsGenerating(true);
     try {
-      const apiInstruct = buildApiInstruct(config.instruct);
       const body: any = {
         model: config.modelId,
         input: text,
         voice: config.voice === 'custom' ? 'alloy' : config.voice,
         speed: config.speed,
         seed: config.seed,
-        instruct: apiInstruct,
+        instruct: config.instruct,
         response_format: config.responseFormat
       };
 
