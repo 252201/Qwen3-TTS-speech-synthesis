@@ -32,8 +32,8 @@ import {
 import { saveAudio, getAudio, deleteAudio } from './lib/db';
 import { TTSConfig, TTSHistoryItem } from './types';
 
-const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit';
-const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-Base-8bit';
+const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16';
+const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-Base-bf16';
 
 const DEFAULT_CONFIG: TTSConfig = {
   apiKey: import.meta.env.VITE_TTS_API_KEY || 'omlx-mpi54dic99snaxxp',
@@ -68,10 +68,8 @@ const EMOTION_PRESETS = [
 ];
 
 const MODEL_PRESETS = [
-  { id: 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit', label: '1.7B-CustomVoice', note: '预设音色推荐' },
-  { id: 'Qwen3-TTS-12Hz-1.7B-Base-8bit', label: '1.7B-Base', note: '语音克隆推荐' },
-  { id: 'Qwen3.5-4B-MLX-8bit', label: 'Qwen3.5-4B-MLX', note: '通用语音模型' },
-  { id: 'Qwen3.5-4B-DFlash', label: 'Qwen3.5-4B-DFlash', note: '接口返回可用' }
+  { id: 'Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16', label: '1.7B-CustomVoice', note: '预设音色推荐' },
+  { id: 'Qwen3-TTS-12Hz-1.7B-Base-bf16', label: '1.7B-Base', note: '语音克隆推荐' },
 ];
 
 const PROMPT_SUGGESTIONS = [
