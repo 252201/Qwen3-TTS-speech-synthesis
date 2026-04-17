@@ -74,9 +74,7 @@ const MODEL_PRESETS = [
 
 const PROMPT_SUGGESTIONS = [
   '欢迎来到今天的节目，我们将用两分钟快速了解这项新技术。',
-  '请把这段广告词念得更温暖、更有亲和力，适合短视频口播。',
-  '各位旅客您好，前方即将到达下一站，请提前做好下车准备。',
-  '下面请听一段沉稳的品牌旁白，语速放慢一些，结尾稍微上扬。'
+  '各位旅客您好，前方即将到达下一站，请提前做好下车准备。'
 ];
 
 function getModelsEndpoint(apiHost: string) {
@@ -501,46 +499,44 @@ export default function App() {
                         className="h-[320px] w-full resize-none rounded-[24px] border border-white/6 bg-[var(--panel)] px-5 py-5 text-base leading-8 text-white outline-none transition-colors placeholder:text-[var(--muted)] focus:border-[var(--line-strong)] sm:text-lg"
                       />
 
-                      <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                        <div className="flex flex-wrap gap-2">
+                      <div className="mt-4 space-y-4">
+                        <div className="flex flex-col gap-3">
                           {PROMPT_SUGGESTIONS.map((prompt) => (
                             <button
                               key={prompt}
                               onClick={() => setText(prompt)}
-                              className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-left text-xs text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:bg-[var(--panel-2)] hover:text-white"
+                              className="w-full rounded-[28px] border border-white/10 bg-white/5 px-6 py-5 text-left text-lg leading-8 text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:bg-[var(--panel-2)] hover:text-white"
                             >
                               {prompt}
                             </button>
                           ))}
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-                          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-mono uppercase tracking-[0.22em] text-[var(--muted)]">
-                            {text.length} chars
-                          </div>
-                          <button
-                            onClick={handleGenerate}
-                            disabled={!text.trim() || isGenerating}
-                            className={cn(
-                              'inline-flex min-w-[200px] items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition',
-                              isGenerating
-                                ? 'cursor-not-allowed bg-white/10 text-[var(--muted)]'
-                                : 'bg-[linear-gradient(135deg,var(--accent),#ffdb78)] text-black shadow-[0_16px_36px_rgba(240,185,96,0.35)] hover:translate-y-[-1px]'
-                            )}
-                          >
-                            {isGenerating ? (
-                              <>
-                                <Loader2 className="h-4.5 w-4.5 animate-spin" />
-                                正在生成语音
-                              </>
-                            ) : (
-                              <>
-                                <Volume2 className="h-4.5 w-4.5" />
-                                立即生成
-                              </>
-                            )}
-                          </button>
-                        </div>
+                        <button
+                          onClick={handleGenerate}
+                          disabled={!text.trim() || isGenerating}
+                          className={cn(
+                            'flex w-full items-center justify-center gap-3 rounded-full px-6 py-4 text-base font-semibold transition',
+                            isGenerating
+                              ? 'cursor-not-allowed bg-white/10 text-[var(--muted)]'
+                              : 'bg-[linear-gradient(135deg,var(--accent),#ffdb78)] text-black shadow-[0_16px_36px_rgba(240,185,96,0.35)] hover:translate-y-[-1px]'
+                          )}
+                        >
+                          {isGenerating ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              正在生成语音
+                            </>
+                          ) : (
+                            <>
+                              <Volume2 className="h-5 w-5" />
+                              立即生成
+                              <span className="rounded-full border border-black/15 bg-black/10 px-3 py-1 text-[11px] font-mono uppercase tracking-[0.22em] text-black/70">
+                                {text.length} chars
+                              </span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     </div>
                   </div>
