@@ -233,6 +233,22 @@ export default function App() {
     ));
   }, [availableModelIds, config.modelId, config.referenceAudioRaw, config.voice]);
 
+  useEffect(() => {
+    if (config.voice === 'custom' && config.referenceAudioRaw) return;
+    if (config.modelId.includes('CustomVoice')) return;
+
+    const preferredPresetModel =
+      availableModelIds.find(id => id === DEFAULT_MODEL_ID) ||
+      availableModelIds.find(id => id.includes('CustomVoice')) ||
+      DEFAULT_MODEL_ID;
+
+    setConfig(prev => (
+      prev.voice !== 'custom' && !prev.referenceAudioRaw && !prev.modelId.includes('CustomVoice')
+        ? { ...prev, modelId: preferredPresetModel }
+        : prev
+    ));
+  }, [availableModelIds, config.modelId, config.referenceAudioRaw, config.voice]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -264,24 +280,25 @@ export default function App() {
   };
 
   const clearReferenceAudio = () => {
+    const presetModel =
+      availableModelIds.find(id => id === DEFAULT_MODEL_ID) ||
+      availableModelIds.find(id => id.includes('CustomVoice')) ||
+      DEFAULT_MODEL_ID;
+
     setConfig(prev => ({
       ...prev,
       referenceAudio: undefined,
       referenceAudioRaw: undefined,
       referenceAudioName: undefined,
       referenceText: undefined,
-      voice: DEFAULT_CONFIG.voice
+      voice: DEFAULT_CONFIG.voice,
+      modelId: presetModel
     }));
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleGenerate = async () => {
     if (!text.trim() || isGenerating) return;
-
-    if (config.voice === 'custom' && config.referenceAudioRaw && !config.referenceText?.trim()) {
-      alert('语音克隆需要填写「参考音频文本」，请在右侧输入参考音频中说的话。');
-      return;
-    }
 
     setIsGenerating(true);
     try {
@@ -297,7 +314,9 @@ export default function App() {
 
       if (config.voice === 'custom' && config.referenceAudioRaw) {
         body.ref_audio = config.referenceAudioRaw;
-        body.ref_text = config.referenceText || '';
+        if (config.referenceText?.trim()) {
+          body.ref_text = config.referenceText.trim();
+        }
       }
 
       const response = await fetch(config.apiHost, {
@@ -833,14 +852,17 @@ export default function App() {
 
                       <div className="space-y-2">
                         <label className="text-[11px] font-mono uppercase tracking-[0.24em] text-[var(--muted)]">
-                          参考音频文本 <span className="text-[var(--accent)]">*</span>
+                          参考音频文本 <span className="text-[var(--accent)]">建议填写</span>
                         </label>
                         <textarea
                           value={config.referenceText || ''}
                           onChange={(e) => setConfig(prev => ({ ...prev, referenceText: e.target.value }))}
-                          placeholder="准确填写参考音频里说的内容，克隆效果会更稳定。"
+                          placeholder="建议准确填写参考音频里说的内容；不填也可尝试，但稳定性和相似度通常会更差。"
                           className="h-24 w-full resize-none rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm leading-6 text-white outline-none transition focus:border-[var(--line-strong)] placeholder:text-[var(--muted)]"
                         />
+                        <p className="text-xs leading-6 text-[var(--soft)]">
+                          官方文档里克隆音色的文本字段是可选的；但在实际兼容接口中，补上原文通常更稳定，也更容易保住同一个人。
+                        </p>
                       </div>
                     </div>
                   ) : (
@@ -878,7 +900,14 @@ export default function App() {
                       <button
                         key={voice.id}
                         disabled={!!config.referenceAudio}
-                        onClick={() => setConfig(prev => ({ ...prev, voice: voice.id }))}
+                        onClick={() => setConfig(prev => ({
+                          ...prev,
+                          voice: voice.id,
+                          modelId:
+                            availableModelIds.find(id => id === DEFAULT_MODEL_ID) ||
+                            availableModelIds.find(id => id.includes('CustomVoice')) ||
+                            DEFAULT_MODEL_ID
+                        }))}
                         className={cn(
                           'rounded-2xl border px-3 py-3 text-left transition',
                           config.voice === voice.id && !config.referenceAudio
