@@ -32,6 +32,7 @@ import { saveAudio, getAudio, deleteAudio } from './lib/db';
 import { TTSConfig, TTSHistoryItem } from './types';
 
 const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit';
+const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-Base-8bit';
 
 const DEFAULT_CONFIG: TTSConfig = {
   apiKey: import.meta.env.VITE_TTS_API_KEY || 'omlx-mpi54dic99snaxxp',
@@ -208,6 +209,22 @@ export default function App() {
     ));
   }, [availableModelIds, config.instruct, config.modelId]);
 
+  useEffect(() => {
+    if (!(config.voice === 'custom' && config.referenceAudioRaw)) return;
+    if (config.modelId.includes('Base')) return;
+
+    const preferredCloneModel =
+      availableModelIds.find(id => id.includes('1.7B-Base')) ||
+      availableModelIds.find(id => id.includes('Base')) ||
+      DEFAULT_CLONE_MODEL_ID;
+
+    setConfig(prev => (
+      prev.voice === 'custom' && prev.referenceAudioRaw && !prev.modelId.includes('Base')
+        ? { ...prev, modelId: preferredCloneModel }
+        : prev
+    ));
+  }, [availableModelIds, config.modelId, config.referenceAudioRaw, config.voice]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -220,12 +237,17 @@ export default function App() {
     try {
       const { wavBlob, rawBase64 } = await convertToWav(file);
       const previewUrl = URL.createObjectURL(wavBlob);
+      const cloneModel =
+        availableModelIds.find(id => id.includes('1.7B-Base')) ||
+        availableModelIds.find(id => id.includes('Base')) ||
+        DEFAULT_CLONE_MODEL_ID;
       setConfig(prev => ({
         ...prev,
         referenceAudio: previewUrl,
         referenceAudioRaw: rawBase64,
         referenceAudioName: file.name,
-        voice: 'custom'
+        voice: 'custom',
+        modelId: cloneModel
       }));
     } catch (err) {
       console.error('Audio conversion failed:', err);
@@ -365,6 +387,10 @@ export default function App() {
   const selectedModel = MODEL_PRESETS.find(model => model.id === config.modelId);
   const isCloneMode = config.voice === 'custom' && !!config.referenceAudioRaw;
   const estimatedSeconds = Math.max(3, Math.ceil(text.trim().length / 7));
+  const isCurrentCompatHost = /api\.252202\.xyz/i.test(config.apiHost);
+  const isPresetEmotionMode = !isCloneMode && !!config.instruct?.trim();
+  const presetVoiceMayDrift = isCurrentCompatHost && !isCloneMode;
+  const seedIsExperimental = isCurrentCompatHost;
   const activeModelPresets = MODEL_PRESETS.map((preset) => ({
     ...preset,
     isAvailable: availableModelIds.length === 0 || availableModelIds.includes(preset.id)
@@ -745,10 +771,22 @@ export default function App() {
                   </div>
                   <p className="mt-3 text-sm leading-6 text-[var(--soft)]">
                     {isCloneMode
-                      ? '已加载参考音频，生成时会附带 ref_audio 与 ref_text。'
-                      : '当前直接使用预设音色，无需上传参考音频。'}
+                      ? '已加载参考音频，当前会自动使用支持 ref_audio 的 Base 模型来锁定说话人。'
+                      : '当前直接使用预设音色。这个接口更像“风格模板”，不保证每次都是严格同一个人。'}
                   </p>
                 </div>
+
+                {presetVoiceMayDrift && (
+                  <div className="rounded-[24px] border border-amber-400/30 bg-amber-500/8 p-4">
+                    <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-amber-200/80">
+                      Compatibility Note
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-amber-50/90">
+                      已实测当前 `api.252202.xyz` 接口在相同 `seed` 下也会返回不同音频。预设音色更适合作为风格参考，
+                      如果你要稳定成“同一个人”，请上传参考音频并填写原文。
+                    </p>
+                  </div>
+                )}
 
                 <div className="rounded-[24px] border border-[var(--line-strong)] bg-[linear-gradient(180deg,rgba(240,185,96,0.12),rgba(255,255,255,0.03))] p-4">
                   <div className="flex items-center gap-3">
@@ -899,6 +937,12 @@ export default function App() {
                   <p className="text-xs leading-6 text-[var(--soft)]">
                     当前接口下，情绪控制会优先切到支持 `instruct` 的 CustomVoice 模型，避免出现“已选择但听感不变”。
                   </p>
+                  {isPresetEmotionMode && (
+                    <p className="rounded-2xl border border-amber-400/30 bg-amber-500/8 px-4 py-3 text-xs leading-6 text-amber-50/90">
+                      当前是“预设音色 + 情绪指令”模式。它可能会同时改变说话风格和说话人质感，所以听起来会像不是同一个人。
+                      如果想保留同一人物，请改用参考音频克隆。
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-1">
@@ -963,7 +1007,11 @@ export default function App() {
                     placeholder="-1 代表完全随机"
                     className="w-full rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white outline-none transition focus:border-[var(--line-strong)] placeholder:text-[var(--muted)]"
                   />
-                  <p className="text-xs leading-6 text-[var(--soft)]">固定种子适合复现同一发声结果，留空或填 `-1` 则每次随机。</p>
+                  <p className="text-xs leading-6 text-[var(--soft)]">
+                    {seedIsExperimental
+                      ? '当前接口实测并不会严格按 seed 复现结果，所以它只能算实验参数，不能保证每次还是同一个人。'
+                      : '固定种子适合复现同一发声结果，留空或填 `-1` 则每次随机。'}
+                  </p>
                 </div>
 
                 <div className="space-y-3">
