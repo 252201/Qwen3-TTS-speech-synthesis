@@ -446,7 +446,7 @@ export default function App() {
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-[1500px] flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <header className={cn(cardClass, 'overflow-hidden')}>
-          <div className="grid gap-8 px-6 py-7 lg:grid-cols-[minmax(0,1.3fr)_420px] lg:px-8">
+          <div className="px-6 py-7 lg:px-8">
             <div className="space-y-6">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="inline-flex items-center gap-2 rounded-full border border-[var(--line-strong)] bg-[var(--panel-2)] px-3 py-1 text-[11px] font-mono uppercase tracking-[0.32em] text-[var(--muted)]">
@@ -498,32 +498,6 @@ export default function App() {
                   </div>
                   <p className="mt-1 text-sm text-[var(--soft)]">回放音量 {config.gain.toFixed(2)}，种子 {config.seed === -1 ? '随机' : config.seed}</p>
                 </div>
-              </div>
-            </div>
-
-            <div className="grid gap-4 self-stretch sm:grid-cols-2 lg:grid-cols-1">
-              <div className="rounded-[26px] border border-[var(--line-strong)] bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
-                      创作状态
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold text-white">{text.length}</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-right">
-                    <div className="text-[11px] font-mono uppercase tracking-[0.22em] text-[var(--muted)]">预计时长</div>
-                    <div className="mt-1 text-sm font-medium text-white">{estimatedSeconds}s</div>
-                  </div>
-                </div>
-                <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/8">
-                  <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),#ffdf7a)] transition-all duration-300"
-                    style={{ width: `${Math.min(100, Math.max(12, text.length / 6))}%` }}
-                  />
-                </div>
-                <p className="mt-3 text-sm leading-6 text-[var(--soft)]">
-                  文本长度和生成时长会随着内容变化动态更新，适合快速口播稿与短音频测试。
-                </p>
               </div>
             </div>
           </div>
@@ -606,6 +580,29 @@ export default function App() {
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
+                  <div className="rounded-[26px] border border-[var(--line-strong)] bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] p-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
+                          创作状态
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold text-white">{text.length}</div>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-right">
+                        <div className="text-[11px] font-mono uppercase tracking-[0.22em] text-[var(--muted)]">预计时长</div>
+                        <div className="mt-1 text-sm font-medium text-white">{estimatedSeconds}s</div>
+                      </div>
+                    </div>
+                    <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/8">
+                      <div
+                        className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),#ffdf7a)] transition-all duration-300"
+                        style={{ width: `${Math.min(100, Math.max(12, text.length / 6))}%` }}
+                      />
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-[var(--soft)]">
+                      文本长度和生成时长会随着内容变化动态更新，适合快速口播稿与短音频测试。
+                    </p>
+                  </div>
                   <div className="rounded-[26px] border border-white/10 bg-black/20 p-5">
                     <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
                       当前音色
@@ -616,17 +613,17 @@ export default function App() {
                     <p className="mt-2 text-sm leading-6 text-[var(--soft)]">
                       {isCloneMode ? '使用上传的人声音频做克隆参考。' : selectedVoice?.description || '从预设里选择一个声音风格。'}
                     </p>
-                  </div>
-                  <div className="rounded-[26px] border border-white/10 bg-black/20 p-5">
-                    <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
-                      情绪提示
+                    <div className="mt-5 border-t border-white/10 pt-4">
+                      <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
+                        情绪提示
+                      </div>
+                      <div className="mt-2 text-lg font-semibold text-white">
+                        {selectedEmotion ? `${selectedEmotion.emoji} ${selectedEmotion.label}` : '自由发挥'}
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-[var(--soft)]">
+                        {config.instruct?.trim() ? '已附加 instruct 描述，会影响发声风格。' : '未设置时会使用更自然的默认朗读风格。'}
+                      </p>
                     </div>
-                    <div className="mt-3 text-xl font-semibold text-white">
-                      {selectedEmotion ? `${selectedEmotion.emoji} ${selectedEmotion.label}` : '自由发挥'}
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-[var(--soft)]">
-                      {config.instruct?.trim() ? '已附加 instruct 描述，会影响发声风格。' : '未设置时会使用更自然的默认朗读风格。'}
-                    </p>
                   </div>
                   <div className="rounded-[26px] border border-white/10 bg-black/20 p-5">
                     <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
