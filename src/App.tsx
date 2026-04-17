@@ -87,6 +87,48 @@ function getModelsEndpoint(apiHost: string) {
   }
 }
 
+async function playCompletionChime() {
+  const AudioContextCtor = window.AudioContext || (window as typeof window & {
+    webkitAudioContext?: typeof AudioContext;
+  }).webkitAudioContext;
+
+  if (!AudioContextCtor) return;
+
+  const audioContext = new AudioContextCtor();
+  const now = audioContext.currentTime;
+  const masterGain = audioContext.createGain();
+  masterGain.connect(audioContext.destination);
+  masterGain.gain.setValueAtTime(0.0001, now);
+  masterGain.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
+  masterGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+
+  const notes = [
+    { frequency: 880, start: now, end: now + 0.16 },
+    { frequency: 1174.66, start: now + 0.18, end: now + 0.4 }
+  ];
+
+  notes.forEach(({ frequency, start, end }) => {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, start);
+
+    gainNode.gain.setValueAtTime(0.0001, start);
+    gainNode.gain.exponentialRampToValueAtTime(0.8, start + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(masterGain);
+    oscillator.start(start);
+    oscillator.stop(end);
+  });
+
+  window.setTimeout(() => {
+    void audioContext.close().catch(() => {});
+  }, 700);
+}
+
 export default function App() {
   const [text, setText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -376,6 +418,7 @@ export default function App() {
       setHistory(prev => [newItem, ...prev]);
       setCurrentAudio(audioUrl);
       setText('');
+      void playCompletionChime();
     } catch (error) {
       console.error('Generation error:', error);
       alert(error instanceof Error ? error.message : 'An error occurred during generation');
