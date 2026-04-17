@@ -43,7 +43,7 @@ const DEFAULT_CONFIG: TTSConfig = {
   voice: 'vivian',
   speed: 1.0,
   seed: 42,
-  responseFormat: 'mp3',
+  responseFormat: 'wav',
   gain: 1.0
 };
 
@@ -82,7 +82,7 @@ const PROMPT_SUGGESTIONS = [
   '下面请听一段沉稳的品牌旁白，语速放慢一些，结尾稍微上扬。'
 ];
 
-const RESPONSE_FORMATS = ['mp3', 'opus', 'aac', 'flac'];
+const RESPONSE_FORMATS = ['wav'];
 
 function getModelsEndpoint(apiHost: string) {
   try {
@@ -370,7 +370,6 @@ export default function App() {
           after: repaired.analysis
         });
       }
-
       const newItemId = crypto.randomUUID();
       await saveAudio(newItemId, blob);
       const audioUrl = URL.createObjectURL(blob);
