@@ -190,3 +190,25 @@ export async function applyGain(audioBlob: Blob, gain: number): Promise<Blob> {
   const wavBuffer = encodeWav(mono, sampleRate);
   return new Blob([wavBuffer], { type: 'audio/wav' });
 }
+
+export async function appendTrailingSilence(audioBlob: Blob, silenceSeconds: number): Promise<Blob> {
+  if (silenceSeconds <= 0) return audioBlob;
+
+  const arrayBuffer = await audioBlob.arrayBuffer();
+  const audioCtx = new AudioContext();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  await audioCtx.close();
+
+  const silenceSamples = Math.max(1, Math.floor(audioBuffer.sampleRate * silenceSeconds));
+  const outputChannels: Float32Array[] = [];
+
+  for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+    const input = audioBuffer.getChannelData(ch);
+    const output = new Float32Array(input.length + silenceSamples);
+    output.set(input, 0);
+    outputChannels.push(output);
+  }
+
+  const wavBuffer = encodeWavChannels(outputChannels, audioBuffer.sampleRate);
+  return new Blob([wavBuffer], { type: 'audio/wav' });
+}

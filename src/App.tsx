@@ -26,6 +26,7 @@ import { format } from 'date-fns';
 import { cn } from './lib/utils';
 import {
   applyGain,
+  appendTrailingSilence,
   convertToWav,
   getResponseFormatFromMimeType
 } from './lib/audioUtils';
@@ -350,7 +351,8 @@ export default function App() {
         getResponseFormatFromMimeType(response.headers.get('content-type')) ||
         getResponseFormatFromMimeType(rawBlob.type) ||
         config.responseFormat;
-      const blob = await applyGain(rawBlob, config.gain);
+      const gainedBlob = await applyGain(rawBlob, config.gain);
+      const blob = await appendTrailingSilence(gainedBlob, 1);
       const responseFormat =
         getResponseFormatFromMimeType(blob.type) ||
         rawResponseFormat;
