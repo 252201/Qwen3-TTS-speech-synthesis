@@ -29,6 +29,54 @@ export async function convertToWav(file: File): Promise<{ wavBlob: Blob; rawBase
   return { wavBlob, rawBase64: base64 };
 }
 
+export interface AudioEndingAnalysis {
+  duration: number;
+  tailRms: number;
+  tailRatio: number;
+}
+
+export async function inspectAudioBlob(blob: Blob): Promise<AudioEndingAnalysis | null> {
+  let audioCtx: AudioContext | null = null;
+
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    audioCtx = new AudioContext();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+    const windowSize = Math.max(1, Math.floor(audioBuffer.sampleRate * 0.12));
+    const tailStart = Math.max(0, audioBuffer.length - windowSize);
+    const prevStart = Math.max(0, tailStart - windowSize);
+    const tailRms = getMonoRms(audioBuffer, tailStart, audioBuffer.length - tailStart);
+    const prevRms = getMonoRms(audioBuffer, prevStart, tailStart - prevStart);
+
+    return {
+      duration: audioBuffer.duration,
+      tailRms,
+      tailRatio: prevRms > 0 ? tailRms / prevRms : tailRms > 0 ? Infinity : 1
+    };
+  } catch (error) {
+    console.warn('Failed to inspect generated audio', error);
+    return null;
+  } finally {
+    if (audioCtx) {
+      await audioCtx.close();
+    }
+  }
+}
+
+export function getResponseFormatFromMimeType(mimeType?: string | null): string | undefined {
+  if (!mimeType) return undefined;
+
+  const normalized = mimeType.toLowerCase();
+
+  if (normalized.includes('wav')) return 'wav';
+  if (normalized.includes('mpeg') || normalized.includes('mp3')) return 'mp3';
+  if (normalized.includes('opus') || normalized.includes('ogg')) return 'opus';
+  if (normalized.includes('aac')) return 'aac';
+  if (normalized.includes('flac')) return 'flac';
+
+  return undefined;
+}
+
 function encodeWav(samples: Float32Array, sampleRate: number): ArrayBuffer {
   const numSamples = samples.length;
   const bytesPerSample = 2; // 16-bit
@@ -70,6 +118,24 @@ function writeString(view: DataView, offset: number, str: string) {
   for (let i = 0; i < str.length; i++) {
     view.setUint8(offset + i, str.charCodeAt(i));
   }
+}
+
+function getMonoRms(audioBuffer: AudioBuffer, startFrame: number, frameCount: number): number {
+  if (frameCount <= 0) return 0;
+
+  let sumSquares = 0;
+  const endFrame = Math.min(audioBuffer.length, startFrame + frameCount);
+  const channelCount = audioBuffer.numberOfChannels;
+
+  for (let frame = startFrame; frame < endFrame; frame++) {
+    let sample = 0;
+    for (let ch = 0; ch < channelCount; ch++) {
+      sample += audioBuffer.getChannelData(ch)[frame] / channelCount;
+    }
+    sumSquares += sample * sample;
+  }
+
+  return Math.sqrt(sumSquares / Math.max(1, endFrame - startFrame));
 }
 
 async function blobToBase64Raw(blob: Blob): Promise<string> {
