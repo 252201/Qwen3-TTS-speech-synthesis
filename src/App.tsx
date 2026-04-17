@@ -428,7 +428,11 @@ export default function App() {
   const selectedEmotion = EMOTION_PRESETS.find(preset => preset.val === config.instruct);
   const selectedModel = MODEL_PRESETS.find(model => model.id === config.modelId);
   const isCloneMode = config.voice === 'custom' && !!config.referenceAudioRaw;
-  const estimatedSeconds = Math.max(3, Math.ceil(text.trim().length / 7));
+  const trimmedTextLength = text.trim().length;
+  const estimatedSeconds = trimmedTextLength === 0 ? 0 : Math.ceil(trimmedTextLength / 7);
+  const progressWidth = trimmedTextLength === 0
+    ? 0
+    : Math.min(100, Math.max(12, trimmedTextLength / 6));
   const isCurrentCompatHost = /api\.252202\.xyz/i.test(config.apiHost);
   const seedIsExperimental = isCurrentCompatHost;
   const referenceTextRequired = isCloneMode && isCurrentCompatHost;
@@ -559,7 +563,7 @@ export default function App() {
                     <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/8">
                       <div
                         className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),#ffdf7a)] transition-all duration-300"
-                        style={{ width: `${Math.min(100, Math.max(12, text.length / 6))}%` }}
+                        style={{ width: `${progressWidth}%` }}
                       />
                     </div>
                   </div>
