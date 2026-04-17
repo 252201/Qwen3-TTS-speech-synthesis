@@ -542,8 +542,8 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 xl:grid-cols-1">
-                  <div className="min-h-[185px] rounded-[26px] border border-[var(--line-strong)] bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] p-5">
+                <div className="grid gap-4 xl:grid-cols-1 xl:grid-rows-[1.08fr_0.97fr_0.97fr_0.97fr] xl:min-h-[612px]">
+                  <div className="flex h-full flex-col rounded-[26px] border border-[var(--line-strong)] bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] p-5">
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
@@ -562,11 +562,8 @@ export default function App() {
                         style={{ width: `${Math.min(100, Math.max(12, text.length / 6))}%` }}
                       />
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-[var(--soft)]">
-                      文本长度和生成时长会随着内容变化动态更新，适合快速口播稿与短音频测试。
-                    </p>
                   </div>
-                  <div className="min-h-[185px] rounded-[26px] border border-white/10 bg-black/20 p-5">
+                  <div className="flex h-full flex-col rounded-[26px] border border-white/10 bg-black/20 p-5">
                     <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
                       当前模型
                     </div>
@@ -577,7 +574,7 @@ export default function App() {
                       {selectedModel?.note || '自定义模型配置'}
                     </p>
                   </div>
-                  <div className="min-h-[185px] rounded-[26px] border border-white/10 bg-black/20 p-5">
+                  <div className="flex h-full flex-col rounded-[26px] border border-white/10 bg-black/20 p-5">
                     <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
                       当前音色
                     </div>
@@ -588,7 +585,7 @@ export default function App() {
                       {isCloneMode ? '使用上传的人声音频做克隆参考。' : selectedVoice?.description || '从预设里选择一个声音风格。'}
                     </p>
                   </div>
-                  <div className="min-h-[185px] rounded-[26px] border border-white/10 bg-black/20 p-5">
+                  <div className="flex h-full flex-col rounded-[26px] border border-white/10 bg-black/20 p-5">
                     <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
                       情绪提示
                     </div>
