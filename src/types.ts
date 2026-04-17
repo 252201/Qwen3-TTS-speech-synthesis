@@ -7,6 +7,8 @@ export interface TTSHistoryItem {
   voice: string;
   speed: number;
   seed: number;
+  responseFormat?: string;
+  gain?: number;
   instruct?: string;
   isCloned?: boolean;
 }

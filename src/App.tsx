@@ -27,7 +27,7 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { format } from 'date-fns';
 import { cn } from './lib/utils';
-import { convertToWav, applyGain } from './lib/audioUtils';
+import { convertToWav } from './lib/audioUtils';
 import { saveAudio, getAudio, deleteAudio } from './lib/db';
 import { TTSConfig, TTSHistoryItem } from './types';
 
@@ -146,6 +146,14 @@ export default function App() {
     const { referenceAudio, referenceAudioRaw, referenceText, ...saveableConfig } = config;
     localStorage.setItem('tts_config', JSON.stringify(saveableConfig));
   }, [config]);
+
+  useEffect(() => {
+    if (config.gain >= 0.25 && config.gain <= 1) return;
+    setConfig(prev => ({
+      ...prev,
+      gain: Math.min(1, Math.max(0.25, prev.gain || 1))
+    }));
+  }, [config.gain]);
 
   useEffect(() => {
     let cancelled = false;
@@ -313,8 +321,7 @@ export default function App() {
         throw new Error(errorMessage);
       }
 
-      const rawBlob = await response.blob();
-      const blob = await applyGain(rawBlob, config.gain);
+      const blob = await response.blob();
       const newItemId = crypto.randomUUID();
       await saveAudio(newItemId, blob);
       const audioUrl = URL.createObjectURL(blob);
@@ -328,6 +335,8 @@ export default function App() {
         voice: config.voice === 'custom' ? `克隆: ${config.referenceAudioName}` : config.voice,
         speed: config.speed,
         seed: config.seed,
+        responseFormat: config.responseFormat,
+        gain: config.gain,
         instruct: config.instruct,
         isCloned: config.voice === 'custom'
       };
@@ -354,6 +363,7 @@ export default function App() {
 
     audioRef.current.src = item.audioUrl;
     audioRef.current.playbackRate = item.speed || 1.0;
+    audioRef.current.volume = Math.min(1, Math.max(0.25, item.gain || 1));
     audioRef.current.play();
     setCurrentAudio(item.audioUrl);
     setIsPlaying(true);
@@ -362,7 +372,7 @@ export default function App() {
   const downloadAudio = (item: TTSHistoryItem) => {
     const a = document.createElement('a');
     a.href = item.audioUrl;
-    a.download = `qwen3-tts-${item.id.slice(0, 8)}.${config.responseFormat}`;
+    a.download = `qwen3-tts-${item.id.slice(0, 8)}.${item.responseFormat || 'mp3'}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -462,7 +472,7 @@ export default function App() {
                   <div className="mt-2 text-lg font-semibold text-white">
                     {config.responseFormat.toUpperCase()} / {config.speed}x
                   </div>
-                  <p className="mt-1 text-sm text-[var(--soft)]">音量 {config.gain.toFixed(1)}x，种子 {config.seed === -1 ? '随机' : config.seed}</p>
+                  <p className="mt-1 text-sm text-[var(--soft)]">回放音量 {config.gain.toFixed(2)}，种子 {config.seed === -1 ? '随机' : config.seed}</p>
                 </div>
               </div>
             </div>
@@ -968,21 +978,21 @@ export default function App() {
 
                   <div className="space-y-3 rounded-[24px] border border-white/10 bg-black/20 p-4">
                     <div className="flex items-center justify-between gap-4">
-                      <label className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">生成音量</label>
-                      <span className="text-sm font-semibold text-white">{config.gain.toFixed(1)}x</span>
+                      <label className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">回放音量</label>
+                      <span className="text-sm font-semibold text-white">{config.gain.toFixed(2)}</span>
                     </div>
                     <input
                       type="range"
                       min="0.25"
-                      max="3"
-                      step="0.25"
+                      max="1"
+                      step="0.05"
                       value={config.gain}
                       onChange={(e) => setConfig(prev => ({ ...prev, gain: parseFloat(e.target.value) }))}
                       className="range-input"
                     />
                     <div className="flex justify-between text-xs text-[var(--muted)]">
                       <span>0.25x</span>
-                      <span>3.0x</span>
+                      <span>1.0x</span>
                     </div>
                   </div>
                 </div>
@@ -1011,6 +1021,15 @@ export default function App() {
                     {seedIsExperimental
                       ? '当前接口实测并不会严格按 seed 复现结果，所以它只能算实验参数，不能保证每次还是同一个人。'
                       : '固定种子适合复现同一发声结果，留空或填 `-1` 则每次随机。'}
+                  </p>
+                </div>
+
+                <div className="rounded-[24px] border border-emerald-400/25 bg-emerald-500/8 p-4">
+                  <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-emerald-200/80">
+                    Audio Integrity
+                  </div>
+                  <p className="mt-2 text-xs leading-6 text-emerald-50/90">
+                    为避免尾部被本地转码裁掉，当前历史保存和下载都会保留接口返回的原始音频；上面的音量只影响本地回放，不再重写文件。
                   </p>
                 </div>
 
