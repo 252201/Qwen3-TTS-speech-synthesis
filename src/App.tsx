@@ -468,37 +468,6 @@ export default function App() {
                 </h1>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
-                    当前模型
-                  </div>
-                  <div className="mt-2 text-lg font-semibold text-white">
-                    {selectedModel?.label || config.modelId}
-                  </div>
-                  <p className="mt-1 text-sm text-[var(--soft)]">{selectedModel?.note || '自定义模型配置'}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
-                    声音模式
-                  </div>
-                  <div className="mt-2 text-lg font-semibold text-white">
-                    {isCloneMode ? '语音克隆' : selectedVoice?.label || '预设音色'}
-                  </div>
-                  <p className="mt-1 text-sm text-[var(--soft)]">
-                    {isCloneMode ? config.referenceAudioName || '已接入参考音频' : selectedVoice?.description || '可直接选择预设'}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
-                    输出概览
-                  </div>
-                  <div className="mt-2 text-lg font-semibold text-white">
-                    {config.responseFormat.toUpperCase()} / {config.speed}x
-                  </div>
-                  <p className="mt-1 text-sm text-[var(--soft)]">回放音量 {config.gain.toFixed(2)}，种子 {config.seed === -1 ? '随机' : config.seed}</p>
-                </div>
-              </div>
             </div>
           </div>
         </header>
@@ -613,25 +582,16 @@ export default function App() {
                     <p className="mt-2 text-sm leading-6 text-[var(--soft)]">
                       {isCloneMode ? '使用上传的人声音频做克隆参考。' : selectedVoice?.description || '从预设里选择一个声音风格。'}
                     </p>
-                    <div className="mt-5 border-t border-white/10 pt-4">
-                      <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
-                        情绪提示
-                      </div>
-                      <div className="mt-2 text-lg font-semibold text-white">
-                        {selectedEmotion ? `${selectedEmotion.emoji} ${selectedEmotion.label}` : '自由发挥'}
-                      </div>
-                      <p className="mt-2 text-sm leading-6 text-[var(--soft)]">
-                        {config.instruct?.trim() ? '已附加 instruct 描述，会影响发声风格。' : '未设置时会使用更自然的默认朗读风格。'}
-                      </p>
-                    </div>
                   </div>
                   <div className="rounded-[26px] border border-white/10 bg-black/20 p-5">
                     <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
-                      生成队列
+                      情绪提示
                     </div>
-                    <div className="mt-3 text-xl font-semibold text-white">{history.length}</div>
+                    <div className="mt-3 text-xl font-semibold text-white">
+                      {selectedEmotion ? `${selectedEmotion.emoji} ${selectedEmotion.label}` : '自由发挥'}
+                    </div>
                     <p className="mt-2 text-sm leading-6 text-[var(--soft)]">
-                      所有结果会保存在本地 IndexedDB，刷新页面后仍可回放和下载。
+                      {config.instruct?.trim() ? '已附加 instruct 描述，会影响发声风格。' : '未设置时会使用更自然的默认朗读风格。'}
                     </p>
                   </div>
                 </div>
