@@ -432,7 +432,7 @@ export default function App() {
   const estimatedSeconds = trimmedTextLength === 0 ? 0 : Math.ceil(trimmedTextLength / 7);
   const progressWidth = trimmedTextLength === 0
     ? 0
-    : Math.min(100, trimmedTextLength * 2);
+    : Math.min(100, (trimmedTextLength / 1000) * 100);
   const isCurrentCompatHost = /api\.252202\.xyz/i.test(config.apiHost);
   const seedIsExperimental = isCurrentCompatHost;
   const referenceTextRequired = isCloneMode && isCurrentCompatHost;
