@@ -63,63 +63,6 @@ export async function inspectAudioBlob(blob: Blob): Promise<AudioEndingAnalysis 
   }
 }
 
-export async function repairAbruptEnding(
-  blob: Blob,
-  analysis: AudioEndingAnalysis | null = null
-): Promise<{ blob: Blob; repaired: boolean; analysis: AudioEndingAnalysis | null }> {
-  const resolvedAnalysis = analysis ?? await inspectAudioBlob(blob);
-  if (!resolvedAnalysis || !isAbruptEnding(resolvedAnalysis)) {
-    return { blob, repaired: false, analysis: resolvedAnalysis };
-  }
-
-  let audioCtx: AudioContext | null = null;
-
-  try {
-    const arrayBuffer = await blob.arrayBuffer();
-    audioCtx = new AudioContext();
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
-    const fadeSamples = Math.max(1, Math.floor(audioBuffer.sampleRate * 0.18));
-    const silenceSamples = Math.max(1, Math.floor(audioBuffer.sampleRate * 0.12));
-    const outputLength = audioBuffer.length + silenceSamples;
-    const outputChannels: Float32Array[] = [];
-
-    for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
-      const input = audioBuffer.getChannelData(ch);
-      const output = new Float32Array(outputLength);
-      output.set(input, 0);
-
-      const fadeStart = Math.max(0, audioBuffer.length - fadeSamples);
-      const fadeSpan = Math.max(1, audioBuffer.length - fadeStart);
-
-      for (let i = 0; i < fadeSpan; i++) {
-        const progress = i / fadeSpan;
-        const envelope = Math.pow(1 - progress, 1.6);
-        output[fadeStart + i] = input[fadeStart + i] * envelope;
-      }
-
-      outputChannels.push(output);
-    }
-
-    const repairedBlob = new Blob(
-      [encodeWavChannels(outputChannels, audioBuffer.sampleRate)],
-      { type: 'audio/wav' }
-    );
-
-    return {
-      blob: repairedBlob,
-      repaired: true,
-      analysis: await inspectAudioBlob(repairedBlob)
-    };
-  } catch (error) {
-    console.warn('Failed to repair abrupt audio ending', error);
-    return { blob, repaired: false, analysis: resolvedAnalysis };
-  } finally {
-    if (audioCtx) {
-      await audioCtx.close();
-    }
-  }
-}
-
 export function getResponseFormatFromMimeType(mimeType?: string | null): string | undefined {
   if (!mimeType) return undefined;
 
@@ -174,10 +117,6 @@ function encodeWavChannels(channelDataList: Float32Array[], sampleRate: number):
   }
 
   return buffer;
-}
-
-function isAbruptEnding(analysis: AudioEndingAnalysis): boolean {
-  return analysis.tailRms > 0.035 && analysis.tailRatio > 1.15;
 }
 
 function writeString(view: DataView, offset: number, str: string) {

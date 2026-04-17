@@ -26,9 +26,7 @@ import { format } from 'date-fns';
 import { cn } from './lib/utils';
 import {
   convertToWav,
-  getResponseFormatFromMimeType,
-  inspectAudioBlob,
-  repairAbruptEnding
+  getResponseFormatFromMimeType
 } from './lib/audioUtils';
 import { saveAudio, getAudio, deleteAudio } from './lib/db';
 import { TTSConfig, TTSHistoryItem } from './types';
@@ -81,8 +79,6 @@ const PROMPT_SUGGESTIONS = [
   '各位旅客您好，前方即将到达下一站，请提前做好下车准备。',
   '下面请听一段沉稳的品牌旁白，语速放慢一些，结尾稍微上扬。'
 ];
-
-const RESPONSE_FORMATS = ['wav'];
 
 function getModelsEndpoint(apiHost: string) {
   try {
@@ -357,19 +353,10 @@ export default function App() {
         getResponseFormatFromMimeType(response.headers.get('content-type')) ||
         getResponseFormatFromMimeType(rawBlob.type) ||
         config.responseFormat;
-      const analysis = await inspectAudioBlob(rawBlob);
-      const repaired = await repairAbruptEnding(rawBlob, analysis);
-      const blob = repaired.blob;
+      const blob = rawBlob;
       const responseFormat =
         getResponseFormatFromMimeType(blob.type) ||
         rawResponseFormat;
-
-      if (repaired.repaired) {
-        console.warn('Applied tail fade-out repair for abrupt audio ending.', {
-          before: analysis,
-          after: repaired.analysis
-        });
-      }
       const newItemId = crypto.randomUUID();
       await saveAudio(newItemId, blob);
       const audioUrl = URL.createObjectURL(blob);
@@ -502,10 +489,6 @@ export default function App() {
                       <p className="max-w-2xl text-sm leading-7 text-[var(--soft)]">
                         左边专注写稿，右边只保留关键信息卡。操作路径更短，也更适合边测试边改口播文案。
                       </p>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-[var(--soft)]">
-                      当前输出:
-                      <span className="ml-2 font-semibold text-white">{config.responseFormat.toUpperCase()}</span>
                     </div>
                   </div>
 
@@ -1007,26 +990,6 @@ export default function App() {
                       ? '当前接口实测并不会严格按 seed 复现结果，所以它只能算实验参数，不能保证每次还是同一个人。'
                       : '固定种子适合复现同一发声结果，留空或填 `-1` 则每次随机。'}
                   </p>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">输出格式</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {RESPONSE_FORMATS.map((formatItem) => (
-                      <button
-                        key={formatItem}
-                        onClick={() => setConfig(prev => ({ ...prev, responseFormat: formatItem }))}
-                        className={cn(
-                          'rounded-2xl border px-2 py-3 text-center text-xs font-semibold uppercase transition',
-                          config.responseFormat === formatItem
-                            ? 'border-[var(--line-strong)] bg-[var(--panel-2)] text-white'
-                            : 'border-white/10 bg-white/5 text-[var(--soft)] hover:border-white/20 hover:text-white'
-                        )}
-                      >
-                        {formatItem}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
               </div>
