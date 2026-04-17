@@ -21,7 +21,6 @@ import {
   Type,
   Upload,
   Volume2,
-  Waves,
   X
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -524,27 +523,6 @@ export default function App() {
                 </div>
                 <p className="mt-3 text-sm leading-6 text-[var(--soft)]">
                   文本长度和生成时长会随着内容变化动态更新，适合快速口播稿与短音频测试。
-                </p>
-              </div>
-
-              <div className="rounded-[26px] border border-white/10 bg-black/20 p-5">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-2xl border border-[var(--line-strong)] bg-[var(--panel-2)] p-3">
-                    <Waves className="h-5 w-5 text-[var(--accent)]" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
-                      最近情绪
-                    </div>
-                    <div className="mt-1 text-base font-semibold text-white">
-                      {selectedEmotion ? `${selectedEmotion.emoji} ${selectedEmotion.label}` : '未添加情绪提示'}
-                    </div>
-                  </div>
-                </div>
-                <p className="mt-4 text-sm leading-6 text-[var(--soft)]">
-                  {selectedEmotion
-                    ? '当前会把语气提示一并送进接口，让同一音色也能做出更明显的表演差异。'
-                    : '你可以在右侧选择预设语气，或者直接输入英文 instruct 描述自定义情绪。'}
                 </p>
               </div>
             </div>
