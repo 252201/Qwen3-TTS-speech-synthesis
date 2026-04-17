@@ -548,7 +548,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                <div className="grid gap-4 xl:grid-cols-1">
                   <div className="min-h-[240px] rounded-[26px] border border-[var(--line-strong)] bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] p-5">
                     <div className="flex items-center justify-between gap-4">
                       <div>
