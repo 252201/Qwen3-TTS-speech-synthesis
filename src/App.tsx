@@ -200,6 +200,7 @@ export default function App() {
 
   useEffect(() => {
     if (!config.instruct?.trim()) return;
+    if (config.voice === 'custom' && config.referenceAudioRaw) return;
     if (config.modelId.includes('CustomVoice')) return;
 
     const preferredEmotionModel =
@@ -207,11 +208,11 @@ export default function App() {
       DEFAULT_MODEL_ID;
 
     setConfig(prev => (
-      prev.modelId.includes('CustomVoice')
+      (prev.voice === 'custom' && prev.referenceAudioRaw) || prev.modelId.includes('CustomVoice')
         ? prev
         : { ...prev, modelId: preferredEmotionModel }
     ));
-  }, [availableModelIds, config.instruct, config.modelId]);
+  }, [availableModelIds, config.instruct, config.modelId, config.referenceAudioRaw, config.voice]);
 
   useEffect(() => {
     if (!(config.voice === 'custom' && config.referenceAudioRaw)) return;
