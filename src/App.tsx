@@ -27,7 +27,8 @@ import { cn } from './lib/utils';
 import {
   convertToWav,
   getResponseFormatFromMimeType,
-  inspectAudioBlob
+  inspectAudioBlob,
+  repairAbruptEnding
 } from './lib/audioUtils';
 import { saveAudio, getAudio, deleteAudio } from './lib/db';
 import { TTSConfig, TTSHistoryItem } from './types';
@@ -91,57 +92,6 @@ function getModelsEndpoint(apiHost: string) {
   } catch {
     return apiHost.replace(/\/audio\/speech\/?$/, '/models');
   }
-}
-
-function isAudioLikelyTruncated(
-  analysis: { duration: number; tailRms: number; tailRatio: number } | null,
-  text: string,
-  speed: number
-) {
-  if (!analysis) return false;
-
-  const compactTextLength = text.replace(/\s+/g, '').length;
-  const abruptTail = analysis.tailRms > 0.035 && analysis.tailRatio > 1.15;
-  const minExpectedDuration =
-    compactTextLength >= 12
-      ? compactTextLength / Math.max(4.3 * Math.max(speed, 0.6), 1)
-      : 0;
-  const suspiciouslyShort =
-    minExpectedDuration > 0 && analysis.duration < minExpectedDuration;
-
-  return abruptTail || suspiciouslyShort;
-}
-
-function shouldPreferAttempt(
-  candidate: {
-    analysis: { duration: number; tailRms: number; tailRatio: number } | null;
-  },
-  current: {
-    analysis: { duration: number; tailRms: number; tailRatio: number } | null;
-  } | null,
-  text: string,
-  speed: number
-) {
-  if (!current) return true;
-
-  const candidateTruncated = isAudioLikelyTruncated(candidate.analysis, text, speed);
-  const currentTruncated = isAudioLikelyTruncated(current.analysis, text, speed);
-
-  if (candidateTruncated !== currentTruncated) {
-    return !candidateTruncated;
-  }
-
-  const candidateDuration = candidate.analysis?.duration ?? 0;
-  const currentDuration = current.analysis?.duration ?? 0;
-
-  if (Math.abs(candidateDuration - currentDuration) > 0.1) {
-    return candidateDuration > currentDuration;
-  }
-
-  const candidateTailRms = candidate.analysis?.tailRms ?? Infinity;
-  const currentTailRms = current.analysis?.tailRms ?? Infinity;
-
-  return candidateTailRms < currentTailRms;
 }
 
 export default function App() {
@@ -381,58 +331,46 @@ export default function App() {
         }
       }
 
-      let bestAttempt: {
-        blob: Blob;
-        responseFormat: string;
-        analysis: { duration: number; tailRms: number; tailRatio: number } | null;
-      } | null = null;
+      const response = await fetch(config.apiHost, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify(body)
+      });
 
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const response = await fetch(config.apiHost, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${config.apiKey}`
-          },
-          body: JSON.stringify(body)
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = '合成语音失败';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error?.message || errorData.message || errorMessage;
+        } catch (e) {
+          errorMessage = `HTTP 错误 ${response.status}: ${errorText.slice(0, 100) || response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const rawBlob = await response.blob();
+      const rawResponseFormat =
+        getResponseFormatFromMimeType(response.headers.get('content-type')) ||
+        getResponseFormatFromMimeType(rawBlob.type) ||
+        config.responseFormat;
+      const analysis = await inspectAudioBlob(rawBlob);
+      const repaired = await repairAbruptEnding(rawBlob, analysis);
+      const blob = repaired.blob;
+      const responseFormat =
+        getResponseFormatFromMimeType(blob.type) ||
+        rawResponseFormat;
+
+      if (repaired.repaired) {
+        console.warn('Applied tail fade-out repair for abrupt audio ending.', {
+          before: analysis,
+          after: repaired.analysis
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          let errorMessage = '合成语音失败';
-          try {
-            const errorData = JSON.parse(errorText);
-            errorMessage = errorData.error?.message || errorData.message || errorMessage;
-          } catch (e) {
-            errorMessage = `HTTP 错误 ${response.status}: ${errorText.slice(0, 100) || response.statusText}`;
-          }
-          throw new Error(errorMessage);
-        }
-
-        const blob = await response.blob();
-        const responseFormat =
-          getResponseFormatFromMimeType(response.headers.get('content-type')) ||
-          getResponseFormatFromMimeType(blob.type) ||
-          config.responseFormat;
-        const analysis = await inspectAudioBlob(blob);
-        const currentAttempt = { blob, responseFormat, analysis };
-
-        if (shouldPreferAttempt(currentAttempt, bestAttempt, text, config.speed)) {
-          bestAttempt = currentAttempt;
-        }
-
-        if (!isAudioLikelyTruncated(analysis, text, config.speed)) {
-          break;
-        }
-
-        console.warn(`Generated audio looked truncated on attempt ${attempt + 1}, retrying...`, analysis);
       }
 
-      if (!bestAttempt) {
-        throw new Error('未能获取有效音频结果');
-      }
-
-      const { blob, responseFormat } = bestAttempt;
       const newItemId = crypto.randomUUID();
       await saveAudio(newItemId, blob);
       const audioUrl = URL.createObjectURL(blob);

@@ -63,6 +63,63 @@ export async function inspectAudioBlob(blob: Blob): Promise<AudioEndingAnalysis 
   }
 }
 
+export async function repairAbruptEnding(
+  blob: Blob,
+  analysis: AudioEndingAnalysis | null = null
+): Promise<{ blob: Blob; repaired: boolean; analysis: AudioEndingAnalysis | null }> {
+  const resolvedAnalysis = analysis ?? await inspectAudioBlob(blob);
+  if (!resolvedAnalysis || !isAbruptEnding(resolvedAnalysis)) {
+    return { blob, repaired: false, analysis: resolvedAnalysis };
+  }
+
+  let audioCtx: AudioContext | null = null;
+
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    audioCtx = new AudioContext();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+    const fadeSamples = Math.max(1, Math.floor(audioBuffer.sampleRate * 0.18));
+    const silenceSamples = Math.max(1, Math.floor(audioBuffer.sampleRate * 0.12));
+    const outputLength = audioBuffer.length + silenceSamples;
+    const outputChannels: Float32Array[] = [];
+
+    for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+      const input = audioBuffer.getChannelData(ch);
+      const output = new Float32Array(outputLength);
+      output.set(input, 0);
+
+      const fadeStart = Math.max(0, audioBuffer.length - fadeSamples);
+      const fadeSpan = Math.max(1, audioBuffer.length - fadeStart);
+
+      for (let i = 0; i < fadeSpan; i++) {
+        const progress = i / fadeSpan;
+        const envelope = Math.pow(1 - progress, 1.6);
+        output[fadeStart + i] = input[fadeStart + i] * envelope;
+      }
+
+      outputChannels.push(output);
+    }
+
+    const repairedBlob = new Blob(
+      [encodeWavChannels(outputChannels, audioBuffer.sampleRate)],
+      { type: 'audio/wav' }
+    );
+
+    return {
+      blob: repairedBlob,
+      repaired: true,
+      analysis: await inspectAudioBlob(repairedBlob)
+    };
+  } catch (error) {
+    console.warn('Failed to repair abrupt audio ending', error);
+    return { blob, repaired: false, analysis: resolvedAnalysis };
+  } finally {
+    if (audioCtx) {
+      await audioCtx.close();
+    }
+  }
+}
+
 export function getResponseFormatFromMimeType(mimeType?: string | null): string | undefined {
   if (!mimeType) return undefined;
 
@@ -78,40 +135,49 @@ export function getResponseFormatFromMimeType(mimeType?: string | null): string 
 }
 
 function encodeWav(samples: Float32Array, sampleRate: number): ArrayBuffer {
-  const numSamples = samples.length;
+  return encodeWavChannels([samples], sampleRate);
+}
+
+function encodeWavChannels(channelDataList: Float32Array[], sampleRate: number): ArrayBuffer {
+  const numChannels = Math.max(1, channelDataList.length);
+  const numSamples = channelDataList[0]?.length ?? 0;
   const bytesPerSample = 2; // 16-bit
-  const dataLength = numSamples * bytesPerSample;
+  const blockAlign = numChannels * bytesPerSample;
+  const dataLength = numSamples * blockAlign;
   const buffer = new ArrayBuffer(44 + dataLength);
   const view = new DataView(buffer);
 
-  // RIFF header
   writeString(view, 0, 'RIFF');
   view.setUint32(4, 36 + dataLength, true);
   writeString(view, 8, 'WAVE');
 
-  // fmt chunk
   writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true); // chunk size
-  view.setUint16(20, 1, true);  // PCM format
-  view.setUint16(22, 1, true);  // mono
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * bytesPerSample, true); // byte rate
-  view.setUint16(32, bytesPerSample, true); // block align
-  view.setUint16(34, 16, true); // bits per sample
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
 
-  // data chunk
   writeString(view, 36, 'data');
   view.setUint32(40, dataLength, true);
 
-  // PCM samples — clamp to [-1, 1] then scale to int16
   let offset = 44;
   for (let i = 0; i < numSamples; i++) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    offset += 2;
+    for (let ch = 0; ch < numChannels; ch++) {
+      const channel = channelDataList[ch] ?? channelDataList[0];
+      const s = Math.max(-1, Math.min(1, channel[i] ?? 0));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      offset += 2;
+    }
   }
 
   return buffer;
+}
+
+function isAbruptEnding(analysis: AudioEndingAnalysis): boolean {
+  return analysis.tailRms > 0.035 && analysis.tailRatio > 1.15;
 }
 
 function writeString(view: DataView, offset: number, str: string) {
