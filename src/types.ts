@@ -22,7 +22,7 @@ export interface TTSConfig {
   seed: number;
   instruct?: string;
   responseFormat: string;
-  gain: number; // Audio volume gain: 0.25 = quiet, 1.0 = normal, 3.0 = loud
+  gain: number; // Output audio gain applied to the generated file before saving
   referenceAudio?: string; // Base64 Data URL for local preview
   referenceAudioRaw?: string; // Pure base64 string (no data: prefix) for API
   referenceAudioName?: string;

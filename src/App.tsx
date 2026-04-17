@@ -25,6 +25,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { format } from 'date-fns';
 import { cn } from './lib/utils';
 import {
+  applyGain,
   convertToWav,
   getResponseFormatFromMimeType
 } from './lib/audioUtils';
@@ -145,10 +146,10 @@ export default function App() {
   }, [config]);
 
   useEffect(() => {
-    if (config.gain >= 0.25 && config.gain <= 1) return;
+    if (config.gain >= 0.25 && config.gain <= 3) return;
     setConfig(prev => ({
       ...prev,
-      gain: Math.min(1, Math.max(0.25, prev.gain || 1))
+      gain: Math.min(3, Math.max(0.25, prev.gain || 1))
     }));
   }, [config.gain]);
 
@@ -353,7 +354,7 @@ export default function App() {
         getResponseFormatFromMimeType(response.headers.get('content-type')) ||
         getResponseFormatFromMimeType(rawBlob.type) ||
         config.responseFormat;
-      const blob = rawBlob;
+      const blob = await applyGain(rawBlob, config.gain);
       const responseFormat =
         getResponseFormatFromMimeType(blob.type) ||
         rawResponseFormat;
@@ -398,7 +399,7 @@ export default function App() {
 
     audioRef.current.src = item.audioUrl;
     audioRef.current.playbackRate = item.speed || 1.0;
-    audioRef.current.volume = Math.min(1, Math.max(0.25, item.gain || 1));
+    audioRef.current.volume = 1;
     audioRef.current.play();
     setCurrentAudio(item.audioUrl);
     setIsPlaying(true);
@@ -946,13 +947,13 @@ export default function App() {
 
                   <div className="space-y-3 rounded-[24px] border border-white/10 bg-black/20 p-4">
                     <div className="flex items-center justify-between gap-4">
-                      <label className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">回放音量</label>
+                      <label className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">生成音量</label>
                       <span className="text-sm font-semibold text-white">{config.gain.toFixed(2)}</span>
                     </div>
                     <input
                       type="range"
                       min="0.25"
-                      max="1"
+                      max="3"
                       step="0.05"
                       value={config.gain}
                       onChange={(e) => setConfig(prev => ({ ...prev, gain: parseFloat(e.target.value) }))}
@@ -960,7 +961,7 @@ export default function App() {
                     />
                     <div className="flex justify-between text-xs text-[var(--muted)]">
                       <span>0.25x</span>
-                      <span>1.0x</span>
+                      <span>3.0x</span>
                     </div>
                   </div>
                 </div>
