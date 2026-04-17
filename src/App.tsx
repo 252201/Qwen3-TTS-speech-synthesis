@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { format } from 'date-fns';
+import { Analytics } from '@vercel/analytics/react';
 import { cn } from './lib/utils';
 import {
   applyGain,
@@ -823,7 +824,7 @@ export default function App() {
                         </div>
                         <div>
                           <div className="text-sm font-medium text-white">上传参考音频</div>
-                          <p className="mt-1 text-xs leading-5 text-[var(--soft)]">支持 WAV / MP3，文件不超过 5MB</p>
+                          <p className="mt-1 text-xs leading-5 text-[var(--soft)]">支持 WAV / MP3��文件不超过 5MB</p>
                         </div>
                       </button>
                       <input
@@ -998,6 +999,7 @@ export default function App() {
       </div>
 
       <audio ref={audioRef} onEnded={() => setIsPlaying(false)} className="hidden" />
+      <Analytics />
     </div>
   );
 }
