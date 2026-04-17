@@ -860,8 +860,12 @@ export default function App() {
                           config.referenceAudio && 'cursor-not-allowed opacity-50'
                         )}
                       >
-                        <div className="text-sm font-medium">{voice.label}</div>
-                        <div className="mt-1 text-xs text-[var(--muted)]">{voice.description}</div>
+                        <div className="text-sm font-medium">
+                          {voice.label}
+                          <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+                            {voice.description}
+                          </span>
+                        </div>
                       </button>
                     ))}
                   </div>
