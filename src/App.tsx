@@ -427,8 +427,6 @@ export default function App() {
   const isCloneMode = config.voice === 'custom' && !!config.referenceAudioRaw;
   const estimatedSeconds = Math.max(3, Math.ceil(text.trim().length / 7));
   const isCurrentCompatHost = /api\.252202\.xyz/i.test(config.apiHost);
-  const isPresetEmotionMode = !isCloneMode && !!config.instruct?.trim();
-  const presetVoiceMayDrift = isCurrentCompatHost && !isCloneMode;
   const seedIsExperimental = isCurrentCompatHost;
   const referenceTextRequired = isCloneMode && isCurrentCompatHost;
   const activeModelPresets = MODEL_PRESETS.map((preset) => ({
@@ -469,9 +467,6 @@ export default function App() {
                     Speech Synthesis Studio
                   </span>
                 </h1>
-                <p className="max-w-2xl text-sm leading-7 text-[var(--soft)] sm:text-base">
-                  重新排版后的工作台把“文本创作、声音设定、生成历史”拆成更清楚的三块区域。你可以一边写稿，一边快速切换音色、情绪和克隆素材，不用在长侧栏里来回找功能。
-                </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
@@ -816,18 +811,6 @@ export default function App() {
                   </p>
                 </div>
 
-                {presetVoiceMayDrift && (
-                  <div className="rounded-[24px] border border-amber-400/30 bg-amber-500/8 p-4">
-                    <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-amber-200/80">
-                      Compatibility Note
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-amber-50/90">
-                      已实测当前 `api.252202.xyz` 接口在相同 `seed` 下也会返回不同音频。预设音色更适合作为风格参考，
-                      如果你要稳定成“同一个人”，请上传参考音频并填写原文。
-                    </p>
-                  </div>
-                )}
-
                 <div className="rounded-[24px] border border-[var(--line-strong)] bg-[linear-gradient(180deg,rgba(240,185,96,0.12),rgba(255,255,255,0.03))] p-4">
                   <div className="flex items-center gap-3">
                     <div className="rounded-2xl border border-[var(--line-strong)] bg-black/20 p-2.5">
@@ -993,15 +976,6 @@ export default function App() {
                     placeholder="或者直接输入英文指令，例如 Speak slowly and warmly..."
                     className="w-full rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white outline-none transition focus:border-[var(--line-strong)] placeholder:text-[var(--muted)]"
                   />
-                  <p className="text-xs leading-6 text-[var(--soft)]">
-                    当前接口下，情绪控制会优先切到支持 `instruct` 的 CustomVoice 模型，避免出现“已选择但听感不变”。
-                  </p>
-                  {isPresetEmotionMode && (
-                    <p className="rounded-2xl border border-amber-400/30 bg-amber-500/8 px-4 py-3 text-xs leading-6 text-amber-50/90">
-                      当前是“预设音色 + 情绪指令”模式。它可能会同时改变说话风格和说话人质感，所以听起来会像不是同一个人。
-                      如果想保留同一人物，请改用参考音频克隆。
-                    </p>
-                  )}
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-1">
@@ -1070,15 +1044,6 @@ export default function App() {
                     {seedIsExperimental
                       ? '当前接口实测并不会严格按 seed 复现结果，所以它只能算实验参数，不能保证每次还是同一个人。'
                       : '固定种子适合复现同一发声结果，留空或填 `-1` 则每次随机。'}
-                  </p>
-                </div>
-
-                <div className="rounded-[24px] border border-emerald-400/25 bg-emerald-500/8 p-4">
-                  <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-emerald-200/80">
-                    Audio Integrity
-                  </div>
-                  <p className="mt-2 text-xs leading-6 text-emerald-50/90">
-                    为避免尾部被本地转码裁掉，当前历史保存和下载都会保留接口返回的原始音频；上面的音量只影响本地回放，不再重写文件。
                   </p>
                 </div>
 
