@@ -900,7 +900,6 @@ export default function App() {
                         <div className="text-sm font-medium">
                           {preset.emoji} {preset.label}
                         </div>
-                        <div className="mt-1 text-[11px] leading-5 text-[var(--muted)]">一键填充 instruct 语气描述</div>
                       </button>
                     ))}
                   </div>
