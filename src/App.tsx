@@ -316,6 +316,7 @@ export default function App() {
         referenceAudio: previewUrl,
         referenceAudioRaw: rawBase64,
         referenceAudioName: file.name,
+        instruct: '',
         voice: 'custom',
         modelId: cloneModel
       }));
@@ -358,13 +359,17 @@ export default function App() {
 
     setIsGenerating(true);
     try {
+      const activeInstructions = config.voice === 'custom' && config.referenceAudioRaw
+        ? ''
+        : config.instruct;
+
       const body: any = {
         model: config.modelId,
         input: text,
         voice: config.voice === 'custom' ? 'alloy' : config.voice,
         seed: config.seed,
         max_tokens: DEFAULT_MAX_TOKENS,
-        instructions: config.instruct,
+        instructions: activeInstructions,
         response_format: config.responseFormat
       };
 
@@ -419,7 +424,7 @@ export default function App() {
         seed: config.seed,
         responseFormat,
         gain: config.gain,
-        instruct: config.instruct,
+        instruct: activeInstructions,
         isCloned: config.voice === 'custom'
       };
 
@@ -479,6 +484,7 @@ export default function App() {
   const selectedEmotion = EMOTION_PRESETS.find(preset => preset.val === config.instruct);
   const selectedModel = MODEL_PRESETS.find(model => model.id === config.modelId);
   const isCloneMode = config.voice === 'custom' && !!config.referenceAudioRaw;
+  const isEmotionLocked = isCloneMode;
   const trimmedTextLength = text.trim().length;
   const estimatedSeconds = trimmedTextLength === 0 ? 0 : Math.ceil(trimmedTextLength / 7);
   const progressWidth = trimmedTextLength === 0
@@ -645,10 +651,12 @@ export default function App() {
                       情绪提示
                     </div>
                     <div className="mt-3 text-xl font-semibold text-white">
-                      {selectedEmotion ? `${selectedEmotion.emoji} ${selectedEmotion.label}` : '自由发挥'}
+                      {isEmotionLocked ? '克隆模式已锁定' : (selectedEmotion ? `${selectedEmotion.emoji} ${selectedEmotion.label}` : '自由发挥')}
                     </div>
                     <p className="mt-2 text-sm leading-6 text-[var(--soft)]">
-                      {config.instruct?.trim() ? '已附加 instruct 描述，会影响发声风格。' : '未设置时会使用更自然的默认朗读风格。'}
+                      {isEmotionLocked
+                        ? 'Base 克隆模式不支持自定义语气与情绪控制，这里会保持锁定。'
+                        : (config.instruct?.trim() ? '已附加 instruct 描述，会影响发声风格。' : '未设置时会使用更自然的默认朗读风格。')}
                     </p>
                   </div>
                 </div>
@@ -925,19 +933,23 @@ export default function App() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <label className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">语气与情绪</label>
-                    {config.instruct && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-[var(--soft)]">{isEmotionLocked ? '克隆模式已锁定' : '可切换'}</span>
+                      {config.instruct && !isEmotionLocked && (
                       <button
                         onClick={() => setConfig(prev => ({ ...prev, instruct: '' }))}
                         className="text-xs text-[var(--soft)] transition hover:text-white"
                       >
                         清除
                       </button>
-                    )}
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {EMOTION_PRESETS.map((preset) => (
                       <button
                         key={preset.label}
+                        disabled={isEmotionLocked}
                         onClick={() => setConfig(prev => ({
                           ...prev,
                           instruct: preset.val,
@@ -950,6 +962,8 @@ export default function App() {
                           config.instruct === preset.val
                             ? 'border-[var(--line-strong)] bg-[var(--panel-2)] text-white'
                             : 'border-white/10 bg-white/5 text-[var(--soft)] hover:border-white/20 hover:text-white'
+                          ,
+                          isEmotionLocked && 'cursor-not-allowed opacity-50'
                         )}
                       >
                         <div className="text-sm font-medium">
@@ -961,6 +975,7 @@ export default function App() {
                   <input
                     type="text"
                     value={config.instruct || ''}
+                    disabled={isEmotionLocked}
                     onChange={(e) => setConfig(prev => ({
                       ...prev,
                       instruct: e.target.value,
@@ -968,8 +983,13 @@ export default function App() {
                         ? (availableModelIds.find(id => id.includes('CustomVoice')) || DEFAULT_MODEL_ID)
                         : prev.modelId
                     }))}
-                    placeholder="或者直接输入英文指令，例如 Speak slowly and warmly..."
-                    className="w-full rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white outline-none transition focus:border-[var(--line-strong)] placeholder:text-[var(--muted)]"
+                    placeholder={isEmotionLocked ? '克隆模式下已锁定情绪控制' : '或者直接输入英文指令，例如 Speak slowly and warmly...'}
+                    className={cn(
+                      'w-full rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[var(--muted)]',
+                      isEmotionLocked
+                        ? 'cursor-not-allowed opacity-50'
+                        : 'focus:border-[var(--line-strong)]'
+                    )}
                   />
                 </div>
 
