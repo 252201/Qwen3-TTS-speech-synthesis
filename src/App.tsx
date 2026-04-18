@@ -27,7 +27,8 @@ import { cn } from './lib/utils';
 import {
   applyGain,
   convertToWav,
-  getResponseFormatFromMimeType
+  getResponseFormatFromMimeType,
+  inspectAudioBlob
 } from './lib/audioUtils';
 import { saveAudio, getAudio, deleteAudio } from './lib/db';
 import { TTSConfig, TTSHistoryItem } from './types';
@@ -78,6 +79,16 @@ const PROMPT_SUGGESTIONS = [
   '欢迎来到今天的节目，我们将用两分钟快速了解这项新技术。',
   '各位旅客您好，前方即将到达下一站，请提前做好下车准备。'
 ];
+
+function formatAudioDuration(durationSeconds?: number): string {
+  if (!durationSeconds || durationSeconds <= 0) return '--';
+
+  const totalSeconds = Math.max(0, Math.round(durationSeconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
 
 function getModelsEndpoint(apiHost: string) {
   try {
@@ -171,7 +182,13 @@ export default function App() {
         const hydrated = await Promise.all(parsed.map(async (item) => {
           const blob = await getAudio(item.id);
           if (!blob) return null;
-          return { ...item, audioUrl: URL.createObjectURL(blob) };
+          const analysis = item.durationSeconds ? null : await inspectAudioBlob(blob);
+          const durationSeconds = item.durationSeconds ?? analysis?.duration;
+          return {
+            ...item,
+            audioUrl: URL.createObjectURL(blob),
+            ...(durationSeconds ? { durationSeconds } : {})
+          };
         }));
         setHistory(hydrated.filter((item): item is TTSHistoryItem => item !== null));
       } catch (e) {
@@ -410,6 +427,7 @@ export default function App() {
       const responseFormat =
         getResponseFormatFromMimeType(blob.type) ||
         rawResponseFormat;
+      const audioAnalysis = await inspectAudioBlob(blob);
       const newItemId = crypto.randomUUID();
       await saveAudio(newItemId, blob);
       const audioUrl = URL.createObjectURL(blob);
@@ -419,6 +437,7 @@ export default function App() {
         text,
         timestamp: Date.now(),
         audioUrl,
+        durationSeconds: audioAnalysis?.duration,
         model: config.modelId,
         voice: config.voice === 'custom' ? `克隆: ${config.referenceAudioName}` : config.voice,
         seed: config.seed,
@@ -719,6 +738,10 @@ export default function App() {
                               <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] text-[var(--soft)]">
                                 <Clock className="h-3.5 w-3.5" />
                                 {format(item.timestamp, 'MM-dd HH:mm')}
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] text-[var(--soft)]">
+                                <AudioLines className="h-3.5 w-3.5" />
+                                {formatAudioDuration(item.durationSeconds)}
                               </span>
                               <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] text-[var(--soft)]">
                                 <Type className="h-3.5 w-3.5" />

@@ -3,6 +3,7 @@ export interface TTSHistoryItem {
   text: string;
   timestamp: number;
   audioUrl: string;
+  durationSeconds?: number;
   model: string;
   voice: string;
   seed: number;
