@@ -355,7 +355,7 @@ export default function App() {
         voice: config.voice === 'custom' ? 'alloy' : config.voice,
         speed: config.speed,
         seed: config.seed,
-        instruct: config.instruct,
+        instructions: config.instruct,
         response_format: config.responseFormat
       };
 
