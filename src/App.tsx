@@ -33,9 +33,9 @@ import {
 import { saveAudio, getAudio, deleteAudio } from './lib/db';
 import { TTSConfig, TTSHistoryItem } from './types';
 
-const DEFAULT_MODEL_FAMILY = '0.6B';
-const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit';
-const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-0.6B-Base-8bit';
+const DEFAULT_MODEL_FAMILY = '1.7B';
+const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit';
+const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-Base-8bit';
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_REMOTE_API_HOST = 'https://api.252202.xyz/v1/audio/speech';
 const LEGACY_LOCAL_OMLX_API_HOST = 'http://127.0.0.1:4321/v1/audio/speech';
@@ -43,7 +43,7 @@ const LEGACY_LOCAL_OMLX_API_HOST = 'http://127.0.0.1:4321/v1/audio/speech';
 const DEFAULT_CONFIG: TTSConfig = {
   apiKey: import.meta.env.VITE_TTS_API_KEY || 'omlx-mpi54dic99snaxxp',
   apiHost: import.meta.env.VITE_TTS_API_HOST || DEFAULT_REMOTE_API_HOST,
-  modelId: import.meta.env.VITE_TTS_MODEL_ID || DEFAULT_MODEL_ID,
+  modelId: normalizeModelId(import.meta.env.VITE_TTS_MODEL_ID) || DEFAULT_MODEL_ID,
   voice: 'vivian',
   seed: 42,
   responseFormat: 'wav',
@@ -72,8 +72,6 @@ const EMOTION_PRESETS = [
 ];
 
 const MODEL_PRESETS = [
-  { id: 'Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit', label: '0.6B-CustomVoice', note: '预设音色推荐' },
-  { id: 'Qwen3-TTS-12Hz-0.6B-Base-8bit', label: '0.6B-Base', note: '语音克隆推荐' },
   { id: 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit', label: '1.7B-CustomVoice', note: '预设音色推荐' },
   { id: 'Qwen3-TTS-12Hz-1.7B-Base-8bit', label: '1.7B-Base', note: '语音克隆推荐' },
 ];
@@ -93,10 +91,12 @@ function formatAudioDuration(durationSeconds?: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-function getModelFamily(modelId?: string) {
-  if (modelId?.includes('1.7B')) return '1.7B';
-  if (modelId?.includes('0.6B')) return '0.6B';
-  return DEFAULT_MODEL_FAMILY;
+function normalizeModelId(modelId?: string) {
+  if (!modelId) return DEFAULT_MODEL_ID;
+  if (modelId.includes('0.6B')) {
+    return modelId.includes('Base') ? DEFAULT_CLONE_MODEL_ID : DEFAULT_MODEL_ID;
+  }
+  return modelId;
 }
 
 function getPreferredModelId(
@@ -178,7 +178,7 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const configLoaded = useRef(false);
-  const currentModelFamily = getModelFamily(config.modelId);
+  const currentModelFamily = DEFAULT_MODEL_FAMILY;
 
   useEffect(() => {
     const savedConfig = localStorage.getItem('tts_config');
@@ -189,6 +189,7 @@ export default function App() {
         setConfig(prev => ({
           ...prev,
           ...rest,
+          modelId: normalizeModelId(rest.modelId),
           apiHost: !rest.apiHost || rest.apiHost === LEGACY_LOCAL_OMLX_API_HOST
             ? DEFAULT_CONFIG.apiHost
             : rest.apiHost
@@ -260,21 +261,22 @@ export default function App() {
         const models = Array.isArray(payload?.data)
           ? payload.data.map((item: { id?: string }) => item.id).filter((id: string | undefined): id is string => !!id)
           : [];
+        const supportedModels = models.filter(id => id.includes(DEFAULT_MODEL_FAMILY));
 
-        if (cancelled || models.length === 0) return;
+        if (cancelled || supportedModels.length === 0) return;
 
-        setAvailableModelIds(models);
+        setAvailableModelIds(supportedModels);
 
-        if (!models.includes(config.modelId)) {
+        if (!supportedModels.includes(config.modelId)) {
           const preferredModel = getPreferredModelId(
-            models,
+            supportedModels,
             currentModelFamily,
             config.voice === 'custom' && config.referenceAudioRaw ? 'Base' : 'CustomVoice'
           );
 
           if (preferredModel) {
             setConfig(prev => (
-              models.includes(prev.modelId)
+              supportedModels.includes(prev.modelId)
                 ? prev
                 : { ...prev, modelId: preferredModel }
             ));
@@ -662,28 +664,8 @@ export default function App() {
                     <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
                       当前模型
                     </div>
-                    <div className="mt-3 inline-flex w-fit rounded-full border border-white/10 bg-white/5 p-1">
-                      {['0.6B', '1.7B'].map((family) => (
-                        <button
-                          key={family}
-                          onClick={() => setConfig(prev => ({
-                            ...prev,
-                            modelId: getPreferredModelId(
-                              availableModelIds,
-                              family,
-                              prev.voice === 'custom' && prev.referenceAudioRaw ? 'Base' : 'CustomVoice'
-                            )
-                          }))}
-                          className={cn(
-                            'rounded-full px-3 py-1.5 text-xs font-mono uppercase tracking-[0.22em] transition',
-                            currentModelFamily === family
-                              ? 'bg-[var(--accent)] text-black'
-                              : 'text-[var(--soft)] hover:text-white'
-                          )}
-                        >
-                          {family}
-                        </button>
-                      ))}
+                    <div className="mt-3 inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-mono uppercase tracking-[0.22em] text-[var(--soft)]">
+                      {DEFAULT_MODEL_FAMILY} only
                     </div>
                     <div className="mt-3 text-xl font-semibold text-white">
                       {selectedModel?.label || config.modelId}
@@ -964,7 +946,7 @@ export default function App() {
                         onClick={() => setConfig(prev => ({
                           ...prev,
                           voice: voice.id,
-                          modelId: getPreferredModelId(availableModelIds, getModelFamily(prev.modelId), 'CustomVoice')
+                          modelId: getPreferredModelId(availableModelIds, DEFAULT_MODEL_FAMILY, 'CustomVoice')
                         }))}
                         className={cn(
                           'rounded-2xl border px-3 py-3 text-left transition',
@@ -1010,7 +992,7 @@ export default function App() {
                           instruct: preset.val,
                           modelId: prev.modelId.includes('CustomVoice')
                             ? prev.modelId
-                            : getPreferredModelId(availableModelIds, getModelFamily(prev.modelId), 'CustomVoice')
+                            : getPreferredModelId(availableModelIds, DEFAULT_MODEL_FAMILY, 'CustomVoice')
                         }))}
                         className={cn(
                           'rounded-2xl border px-3 py-3 text-left transition',
@@ -1035,7 +1017,7 @@ export default function App() {
                       ...prev,
                       instruct: e.target.value,
                       modelId: e.target.value.trim() && !prev.modelId.includes('CustomVoice')
-                        ? getPreferredModelId(availableModelIds, getModelFamily(prev.modelId), 'CustomVoice')
+                        ? getPreferredModelId(availableModelIds, DEFAULT_MODEL_FAMILY, 'CustomVoice')
                         : prev.modelId
                     }))}
                     placeholder={isEmotionLocked ? '克隆模式下已锁定情绪控制' : '或者直接输入英文指令，例如 Speak slowly and warmly...'}
