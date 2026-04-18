@@ -33,8 +33,9 @@ import {
 import { saveAudio, getAudio, deleteAudio } from './lib/db';
 import { TTSConfig, TTSHistoryItem } from './types';
 
-const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit';
-const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-Base-8bit';
+const DEFAULT_MODEL_FAMILY = '0.6B';
+const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit';
+const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-0.6B-Base-8bit';
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_REMOTE_API_HOST = 'https://api.252202.xyz/v1/audio/speech';
 const LEGACY_LOCAL_OMLX_API_HOST = 'http://127.0.0.1:4321/v1/audio/speech';
@@ -71,6 +72,8 @@ const EMOTION_PRESETS = [
 ];
 
 const MODEL_PRESETS = [
+  { id: 'Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit', label: '0.6B-CustomVoice', note: '预设音色推荐' },
+  { id: 'Qwen3-TTS-12Hz-0.6B-Base-8bit', label: '0.6B-Base', note: '语音克隆推荐' },
   { id: 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit', label: '1.7B-CustomVoice', note: '预设音色推荐' },
   { id: 'Qwen3-TTS-12Hz-1.7B-Base-8bit', label: '1.7B-Base', note: '语音克隆推荐' },
 ];
@@ -88,6 +91,28 @@ function formatAudioDuration(durationSeconds?: number): string {
   const seconds = totalSeconds % 60;
 
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function getModelFamily(modelId?: string) {
+  if (modelId?.includes('1.7B')) return '1.7B';
+  if (modelId?.includes('0.6B')) return '0.6B';
+  return DEFAULT_MODEL_FAMILY;
+}
+
+function getPreferredModelId(
+  availableModelIds: string[],
+  family: string,
+  kind: 'CustomVoice' | 'Base'
+) {
+  const exactId = `Qwen3-TTS-12Hz-${family}-${kind}-8bit`;
+  const fallbackDefault = kind === 'CustomVoice' ? DEFAULT_MODEL_ID : DEFAULT_CLONE_MODEL_ID;
+
+  return (
+    availableModelIds.find(id => id === exactId) ||
+    availableModelIds.find(id => id.includes(family) && id.includes(kind)) ||
+    availableModelIds.find(id => id.includes(kind)) ||
+    fallbackDefault
+  );
 }
 
 function getModelsEndpoint(apiHost: string) {
@@ -153,6 +178,7 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const configLoaded = useRef(false);
+  const currentModelFamily = getModelFamily(config.modelId);
 
   useEffect(() => {
     const savedConfig = localStorage.getItem('tts_config');
@@ -240,9 +266,11 @@ export default function App() {
         setAvailableModelIds(models);
 
         if (!models.includes(config.modelId)) {
-          const preferredModel =
-            models.find(id => id.includes('CustomVoice')) ||
-            models[0];
+          const preferredModel = getPreferredModelId(
+            models,
+            currentModelFamily,
+            config.voice === 'custom' && config.referenceAudioRaw ? 'Base' : 'CustomVoice'
+          );
 
           if (preferredModel) {
             setConfig(prev => (
@@ -262,55 +290,47 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [config.apiHost, config.apiKey, config.modelId]);
+  }, [config.apiHost, config.apiKey, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
 
   useEffect(() => {
     if (!config.instruct?.trim()) return;
     if (config.voice === 'custom' && config.referenceAudioRaw) return;
     if (config.modelId.includes('CustomVoice')) return;
 
-    const preferredEmotionModel =
-      availableModelIds.find(id => id.includes('CustomVoice')) ||
-      DEFAULT_MODEL_ID;
+    const preferredEmotionModel = getPreferredModelId(availableModelIds, currentModelFamily, 'CustomVoice');
 
     setConfig(prev => (
       (prev.voice === 'custom' && prev.referenceAudioRaw) || prev.modelId.includes('CustomVoice')
         ? prev
         : { ...prev, modelId: preferredEmotionModel }
     ));
-  }, [availableModelIds, config.instruct, config.modelId, config.referenceAudioRaw, config.voice]);
+  }, [availableModelIds, config.instruct, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
 
   useEffect(() => {
     if (!(config.voice === 'custom' && config.referenceAudioRaw)) return;
     if (config.modelId.includes('Base')) return;
 
-    const preferredCloneModel =
-      availableModelIds.find(id => id.includes('1.7B-Base')) ||
-      availableModelIds.find(id => id.includes('Base')) ||
-      DEFAULT_CLONE_MODEL_ID;
+    const preferredCloneModel = getPreferredModelId(availableModelIds, currentModelFamily, 'Base');
 
     setConfig(prev => (
       prev.voice === 'custom' && prev.referenceAudioRaw && !prev.modelId.includes('Base')
         ? { ...prev, modelId: preferredCloneModel }
         : prev
     ));
-  }, [availableModelIds, config.modelId, config.referenceAudioRaw, config.voice]);
+  }, [availableModelIds, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
 
   useEffect(() => {
     if (config.voice === 'custom' && config.referenceAudioRaw) return;
     if (config.modelId.includes('CustomVoice')) return;
 
-    const preferredPresetModel =
-      availableModelIds.find(id => id === DEFAULT_MODEL_ID) ||
-      availableModelIds.find(id => id.includes('CustomVoice')) ||
-      DEFAULT_MODEL_ID;
+    const preferredPresetModel = getPreferredModelId(availableModelIds, currentModelFamily, 'CustomVoice');
 
     setConfig(prev => (
       prev.voice !== 'custom' && !prev.referenceAudioRaw && !prev.modelId.includes('CustomVoice')
         ? { ...prev, modelId: preferredPresetModel }
         : prev
     ));
-  }, [availableModelIds, config.modelId, config.referenceAudioRaw, config.voice]);
+  }, [availableModelIds, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -324,10 +344,7 @@ export default function App() {
     try {
       const { wavBlob, rawBase64 } = await convertToWav(file);
       const previewUrl = URL.createObjectURL(wavBlob);
-      const cloneModel =
-        availableModelIds.find(id => id.includes('1.7B-Base')) ||
-        availableModelIds.find(id => id.includes('Base')) ||
-        DEFAULT_CLONE_MODEL_ID;
+      const cloneModel = getPreferredModelId(availableModelIds, currentModelFamily, 'Base');
       setConfig(prev => ({
         ...prev,
         referenceAudio: previewUrl,
@@ -345,9 +362,7 @@ export default function App() {
 
   const clearReferenceAudio = () => {
     const presetModel =
-      availableModelIds.find(id => id === DEFAULT_MODEL_ID) ||
-      availableModelIds.find(id => id.includes('CustomVoice')) ||
-      DEFAULT_MODEL_ID;
+      getPreferredModelId(availableModelIds, currentModelFamily, 'CustomVoice');
 
     setConfig(prev => ({
       ...prev,
@@ -647,6 +662,29 @@ export default function App() {
                     <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
                       当前模型
                     </div>
+                    <div className="mt-3 inline-flex w-fit rounded-full border border-white/10 bg-white/5 p-1">
+                      {['0.6B', '1.7B'].map((family) => (
+                        <button
+                          key={family}
+                          onClick={() => setConfig(prev => ({
+                            ...prev,
+                            modelId: getPreferredModelId(
+                              availableModelIds,
+                              family,
+                              prev.voice === 'custom' && prev.referenceAudioRaw ? 'Base' : 'CustomVoice'
+                            )
+                          }))}
+                          className={cn(
+                            'rounded-full px-3 py-1.5 text-xs font-mono uppercase tracking-[0.22em] transition',
+                            currentModelFamily === family
+                              ? 'bg-[var(--accent)] text-black'
+                              : 'text-[var(--soft)] hover:text-white'
+                          )}
+                        >
+                          {family}
+                        </button>
+                      ))}
+                    </div>
                     <div className="mt-3 text-xl font-semibold text-white">
                       {selectedModel?.label || config.modelId}
                     </div>
@@ -929,10 +967,7 @@ export default function App() {
                         onClick={() => setConfig(prev => ({
                           ...prev,
                           voice: voice.id,
-                          modelId:
-                            availableModelIds.find(id => id === DEFAULT_MODEL_ID) ||
-                            availableModelIds.find(id => id.includes('CustomVoice')) ||
-                            DEFAULT_MODEL_ID
+                          modelId: getPreferredModelId(availableModelIds, getModelFamily(prev.modelId), 'CustomVoice')
                         }))}
                         className={cn(
                           'rounded-2xl border px-3 py-3 text-left transition',
@@ -978,7 +1013,7 @@ export default function App() {
                           instruct: preset.val,
                           modelId: prev.modelId.includes('CustomVoice')
                             ? prev.modelId
-                            : (availableModelIds.find(id => id.includes('CustomVoice')) || DEFAULT_MODEL_ID)
+                            : getPreferredModelId(availableModelIds, getModelFamily(prev.modelId), 'CustomVoice')
                         }))}
                         className={cn(
                           'rounded-2xl border px-3 py-3 text-left transition',
@@ -1003,7 +1038,7 @@ export default function App() {
                       ...prev,
                       instruct: e.target.value,
                       modelId: e.target.value.trim() && !prev.modelId.includes('CustomVoice')
-                        ? (availableModelIds.find(id => id.includes('CustomVoice')) || DEFAULT_MODEL_ID)
+                        ? getPreferredModelId(availableModelIds, getModelFamily(prev.modelId), 'CustomVoice')
                         : prev.modelId
                     }))}
                     placeholder={isEmotionLocked ? '克隆模式下已锁定情绪控制' : '或者直接输入英文指令，例如 Speak slowly and warmly...'}
