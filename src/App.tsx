@@ -192,6 +192,11 @@ export default function App() {
   }, [config.gain]);
 
   useEffect(() => {
+    if (config.speed === 1) return;
+    setConfig(prev => ({ ...prev, speed: 1 }));
+  }, [config.speed]);
+
+  useEffect(() => {
     let cancelled = false;
 
     const loadAvailableModels = async () => {
@@ -353,7 +358,7 @@ export default function App() {
         model: config.modelId,
         input: text,
         voice: config.voice === 'custom' ? 'alloy' : config.voice,
-        speed: config.speed,
+        speed: 1,
         seed: config.seed,
         instructions: config.instruct,
         response_format: config.responseFormat
@@ -407,7 +412,7 @@ export default function App() {
         audioUrl,
         model: config.modelId,
         voice: config.voice === 'custom' ? `克隆: ${config.referenceAudioName}` : config.voice,
-        speed: config.speed,
+        speed: 1,
         seed: config.seed,
         responseFormat,
         gain: config.gain,
@@ -437,7 +442,7 @@ export default function App() {
     }
 
     audioRef.current.src = item.audioUrl;
-    audioRef.current.playbackRate = item.speed || 1.0;
+    audioRef.current.playbackRate = 1.0;
     audioRef.current.volume = 1;
     audioRef.current.play();
     setCurrentAudio(item.audioUrl);
@@ -706,7 +711,7 @@ export default function App() {
                               </span>
                               <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] text-[var(--soft)]">
                                 <Type className="h-3.5 w-3.5" />
-                                {itemVoice} / {item.speed}x
+                                {itemVoice}
                               </span>
                               <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] text-[var(--soft)]">
                                 种子 {item.seed === -1 ? '随机' : item.seed}
@@ -965,27 +970,7 @@ export default function App() {
                   />
                 </div>
 
-                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-1">
-                  <div className="space-y-3 rounded-[24px] border border-white/10 bg-black/20 p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <label className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">播放语速</label>
-                      <span className="text-sm font-semibold text-white">{config.speed}x</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.25"
-                      max="4"
-                      step="0.25"
-                      value={config.speed}
-                      onChange={(e) => setConfig(prev => ({ ...prev, speed: parseFloat(e.target.value) }))}
-                      className="range-input"
-                    />
-                    <div className="flex justify-between text-xs text-[var(--muted)]">
-                      <span>0.25x</span>
-                      <span>4.0x</span>
-                    </div>
-                  </div>
-
+                <div className="grid gap-5 xl:grid-cols-1">
                   <div className="space-y-3 rounded-[24px] border border-white/10 bg-black/20 p-4">
                     <div className="flex items-center justify-between gap-4">
                       <label className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">生成音量</label>
