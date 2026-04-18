@@ -798,7 +798,7 @@ export default function App() {
                       <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
                         当前模式
                       </div>
-                      <div className="mt-2 text-lg font-semibold text-white">{isCloneMode ? 'Voice Clone' : 'Preset Voice'}</div>
+                      <div className="mt-2 text-lg font-semibold text-white">{isCloneMode ? '语音克隆' : '预设语音'}</div>
                     </div>
                     <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[var(--soft)]">
                       {config.responseFormat.toUpperCase()}
