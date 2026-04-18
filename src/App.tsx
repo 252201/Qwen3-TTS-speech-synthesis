@@ -35,10 +35,12 @@ import { TTSConfig, TTSHistoryItem } from './types';
 const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit';
 const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-Base-8bit';
 const DEFAULT_MAX_TOKENS = 4096;
+const LOCAL_OMLX_API_HOST = 'http://127.0.0.1:4321/v1/audio/speech';
+const LEGACY_REMOTE_API_HOST = 'https://api.252202.xyz/v1/audio/speech';
 
 const DEFAULT_CONFIG: TTSConfig = {
   apiKey: import.meta.env.VITE_TTS_API_KEY || 'omlx-mpi54dic99snaxxp',
-  apiHost: 'https://api.252202.xyz/v1/audio/speech',
+  apiHost: import.meta.env.VITE_TTS_API_HOST || LOCAL_OMLX_API_HOST,
   modelId: import.meta.env.VITE_TTS_MODEL_ID || DEFAULT_MODEL_ID,
   voice: 'vivian',
   seed: 42,
@@ -147,7 +149,13 @@ export default function App() {
       try {
         const parsed = JSON.parse(savedConfig);
         const { speed: _legacySpeed, ...rest } = parsed;
-        setConfig(prev => ({ ...prev, ...rest }));
+        setConfig(prev => ({
+          ...prev,
+          ...rest,
+          apiHost: !rest.apiHost || rest.apiHost === LEGACY_REMOTE_API_HOST
+            ? DEFAULT_CONFIG.apiHost
+            : rest.apiHost
+        }));
       } catch (e) {
         console.error('Failed to parse config', e);
       }
