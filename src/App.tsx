@@ -34,6 +34,7 @@ import { TTSConfig, TTSHistoryItem } from './types';
 
 const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit';
 const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-Base-8bit';
+const DEFAULT_MAX_TOKENS = 4096;
 
 const DEFAULT_CONFIG: TTSConfig = {
   apiKey: import.meta.env.VITE_TTS_API_KEY || 'omlx-mpi54dic99snaxxp',
@@ -354,6 +355,7 @@ export default function App() {
         input: text,
         voice: config.voice === 'custom' ? 'alloy' : config.voice,
         seed: config.seed,
+        max_tokens: DEFAULT_MAX_TOKENS,
         instructions: config.instruct,
         response_format: config.responseFormat
       };
