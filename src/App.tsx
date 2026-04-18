@@ -40,7 +40,6 @@ const DEFAULT_CONFIG: TTSConfig = {
   apiHost: 'https://api.252202.xyz/v1/audio/speech',
   modelId: import.meta.env.VITE_TTS_MODEL_ID || DEFAULT_MODEL_ID,
   voice: 'vivian',
-  speed: 1.0,
   seed: 42,
   responseFormat: 'wav',
   gain: 1.0
@@ -146,7 +145,8 @@ export default function App() {
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
-        setConfig(prev => ({ ...prev, ...parsed }));
+        const { speed: _legacySpeed, ...rest } = parsed;
+        setConfig(prev => ({ ...prev, ...rest }));
       } catch (e) {
         console.error('Failed to parse config', e);
       }
@@ -179,7 +179,7 @@ export default function App() {
 
   useEffect(() => {
     if (!configLoaded.current) return;
-    const { referenceAudio, referenceAudioRaw, referenceText, ...saveableConfig } = config;
+    const { referenceAudio, referenceAudioRaw, referenceText, speed: _legacySpeed, ...saveableConfig } = config as TTSConfig & { speed?: number };
     localStorage.setItem('tts_config', JSON.stringify(saveableConfig));
   }, [config]);
 
@@ -190,11 +190,6 @@ export default function App() {
       gain: Math.min(3, Math.max(0.25, prev.gain || 1))
     }));
   }, [config.gain]);
-
-  useEffect(() => {
-    if (config.speed === 1) return;
-    setConfig(prev => ({ ...prev, speed: 1 }));
-  }, [config.speed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -358,7 +353,6 @@ export default function App() {
         model: config.modelId,
         input: text,
         voice: config.voice === 'custom' ? 'alloy' : config.voice,
-        speed: 1,
         seed: config.seed,
         instructions: config.instruct,
         response_format: config.responseFormat
@@ -412,7 +406,6 @@ export default function App() {
         audioUrl,
         model: config.modelId,
         voice: config.voice === 'custom' ? `克隆: ${config.referenceAudioName}` : config.voice,
-        speed: 1,
         seed: config.seed,
         responseFormat,
         gain: config.gain,

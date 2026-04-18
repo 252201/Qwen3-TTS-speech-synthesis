@@ -5,7 +5,6 @@ export interface TTSHistoryItem {
   audioUrl: string;
   model: string;
   voice: string;
-  speed: number;
   seed: number;
   responseFormat?: string;
   gain?: number;
@@ -18,7 +17,6 @@ export interface TTSConfig {
   apiHost: string;
   modelId: string;
   voice: string;
-  speed: number;
   seed: number;
   instruct?: string;
   responseFormat: string;
