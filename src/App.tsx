@@ -74,7 +74,7 @@ const MODEL_PRESETS = [
 
 const PROMPT_SUGGESTIONS = [
   '欢迎来到今天的节目，我们将用两分钟快速了解这项新技术。',
-  '各位旅客您好，前方即将到达下一站，请提前做好下车准备，祝您旅途愉快。'
+  '各位旅客您好，前方即将到达下一站，请提前做好下车准备。'
 ];
 
 function getModelsEndpoint(apiHost: string) {
