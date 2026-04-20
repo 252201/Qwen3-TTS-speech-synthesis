@@ -760,108 +760,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
-                          Speech To Text
-                        </div>
-                        <div className="mt-1 text-sm text-[var(--soft)]">
-                          上传音频后转写，识别结果会单独显示在这里
-                        </div>
-                      </div>
-                      <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-mono uppercase tracking-[0.22em] text-[var(--soft)]">
-                        ASR 1.7B
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                      <button
-                        onClick={() => transcriptionInputRef.current?.click()}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:text-white"
-                      >
-                        <Upload className="h-4.5 w-4.5 text-[var(--accent)]" />
-                        {transcriptionFile ? '更换音频' : '上传待转写音频'}
-                      </button>
-
-                      <button
-                        onClick={handleTranscribeAudio}
-                        disabled={!transcriptionFile || isTranscribing}
-                        className={cn(
-                          'inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition',
-                          !transcriptionFile || isTranscribing
-                            ? 'cursor-not-allowed border border-white/10 bg-white/5 text-[var(--muted)]'
-                            : 'border border-[var(--line-strong)] bg-[var(--panel-2)] text-white hover:bg-white/10'
-                        )}
-                      >
-                        {isTranscribing ? (
-                          <>
-                            <Loader2 className="h-4.5 w-4.5 animate-spin" />
-                            正在转写
-                          </>
-                        ) : (
-                          <>
-                            <Type className="h-4.5 w-4.5" />
-                            语音转文本
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    <input
-                      ref={transcriptionInputRef}
-                      type="file"
-                        accept="audio/*,video/*"
-                        onChange={handleTranscriptionFileChange}
-                        className="hidden"
-                    />
-
-                    {transcriptionFile && (
-                      <div className="mt-3 rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white">
-                        {transcriptionFile.name}
-                      </div>
-                    )}
-
-                    {transcriptionResult && (
-                      <div className="mt-3 rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex flex-wrap gap-2 text-[11px] text-[var(--soft)]">
-                            {transcriptionResult.language && (
-                              <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
-                                {transcriptionResult.language}
-                              </span>
-                            )}
-                            {transcriptionResult.duration && (
-                              <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
-                                {formatAudioDuration(transcriptionResult.duration)}
-                              </span>
-                            )}
-                          </div>
-
-                          <button
-                            onClick={handleCopyTranscription}
-                            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:text-white"
-                          >
-                            {transcriptionCopied ? (
-                              <>
-                                <Check className="h-3.5 w-3.5 text-[var(--accent)]" />
-                                已复制
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-3.5 w-3.5" />
-                                复制文本
-                              </>
-                            )}
-                          </button>
-                        </div>
-
-                        <p className="mt-3 text-sm leading-7 text-white">
-                          {transcriptionResult.text}
-                        </p>
-                      </div>
-                    )}
-                  </div>
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-1 xl:grid-rows-4 xl:min-h-[560px]">
@@ -921,6 +819,111 @@ export default function App() {
                     </p>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <section className={cn(cardClass, 'p-5 sm:p-6 xl:p-8')}>
+              <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
+                      Speech To Text
+                    </div>
+                    <div className="mt-1 text-sm text-[var(--soft)]">
+                      上传音频后转写，识别结果会单独显示在这里
+                    </div>
+                  </div>
+                  <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-mono uppercase tracking-[0.22em] text-[var(--soft)]">
+                    ASR 1.7B
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    onClick={() => transcriptionInputRef.current?.click()}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:text-white"
+                  >
+                    <Upload className="h-4.5 w-4.5 text-[var(--accent)]" />
+                    {transcriptionFile ? '更换音频' : '上传待转写音频'}
+                  </button>
+
+                  <button
+                    onClick={handleTranscribeAudio}
+                    disabled={!transcriptionFile || isTranscribing}
+                    className={cn(
+                      'inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition',
+                      !transcriptionFile || isTranscribing
+                        ? 'cursor-not-allowed border border-white/10 bg-white/5 text-[var(--muted)]'
+                        : 'border border-[var(--line-strong)] bg-[var(--panel-2)] text-white hover:bg-white/10'
+                    )}
+                  >
+                    {isTranscribing ? (
+                      <>
+                        <Loader2 className="h-4.5 w-4.5 animate-spin" />
+                        正在转写
+                      </>
+                    ) : (
+                      <>
+                        <Type className="h-4.5 w-4.5" />
+                        语音转文本
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <input
+                  ref={transcriptionInputRef}
+                  type="file"
+                  accept="audio/*,video/*"
+                  onChange={handleTranscriptionFileChange}
+                  className="hidden"
+                />
+
+                {transcriptionFile && (
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white">
+                    {transcriptionFile.name}
+                  </div>
+                )}
+
+                {transcriptionResult && (
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap gap-2 text-[11px] text-[var(--soft)]">
+                        {transcriptionResult.language && (
+                          <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
+                            {transcriptionResult.language}
+                          </span>
+                        )}
+                        {transcriptionResult.duration && (
+                          <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
+                            {formatAudioDuration(transcriptionResult.duration)}
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={handleCopyTranscription}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:text-white"
+                      >
+                        {transcriptionCopied ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-[var(--accent)]" />
+                            已复制
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            复制文本
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <p className="mt-3 text-sm leading-7 text-white">
+                      {transcriptionResult.text}
+                    </p>
+                  </div>
+                )}
               </div>
             </section>
 
