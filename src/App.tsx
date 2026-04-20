@@ -6,7 +6,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AudioLines,
+  Check,
   Clock,
+  Copy,
   Download,
   History,
   Loader2,
@@ -192,6 +194,7 @@ export default function App() {
     language?: string;
     duration?: number;
   } | null>(null);
+  const [transcriptionCopied, setTranscriptionCopied] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const transcriptionInputRef = useRef<HTMLInputElement>(null);
@@ -402,6 +405,7 @@ export default function App() {
 
     setTranscriptionFile(file);
     setTranscriptionResult(null);
+    setTranscriptionCopied(false);
   };
 
   const handleTranscribeAudio = async () => {
@@ -445,12 +449,24 @@ export default function App() {
         language: typeof payload?.language === 'string' ? payload.language : undefined,
         duration: typeof payload?.duration === 'number' ? payload.duration : undefined
       });
-      setText(transcript);
     } catch (error) {
       console.error('Transcription error:', error);
       alert(error instanceof Error ? error.message : '语音转文本失败');
     } finally {
       setIsTranscribing(false);
+    }
+  };
+
+  const handleCopyTranscription = async () => {
+    if (!transcriptionResult?.text) return;
+
+    try {
+      await navigator.clipboard.writeText(transcriptionResult.text);
+      setTranscriptionCopied(true);
+      window.setTimeout(() => setTranscriptionCopied(false), 1600);
+    } catch (error) {
+      console.error('Copy transcription failed:', error);
+      alert('复制失败，请稍后重试');
     }
   };
 
@@ -656,6 +672,58 @@ export default function App() {
                     </div>
                   </div>
 
+                  <div className="relative">
+                    <div className="pointer-events-none absolute -inset-px rounded-[30px] bg-[linear-gradient(135deg,rgba(240,185,96,0.35),transparent_40%,rgba(73,128,255,0.2))] opacity-70" />
+                    <div className="relative rounded-[30px] border border-white/10 bg-[rgba(8,11,20,0.92)] p-4 sm:p-5">
+                      <textarea
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        placeholder="输入要合成的文本，例如广告口播、欢迎词、旁白、提醒播报..."
+                        className="h-[320px] w-full resize-none rounded-[24px] border border-white/6 bg-[var(--panel)] px-5 py-5 text-base leading-8 text-white outline-none transition-colors placeholder:text-[var(--muted)] focus:border-[var(--line-strong)] sm:text-lg"
+                      />
+
+                      <div className="mt-4 space-y-4">
+                        <div className="flex flex-col gap-3">
+                          {PROMPT_SUGGESTIONS.map((prompt) => (
+                            <button
+                              key={prompt}
+                              onClick={() => setText(prompt)}
+                              className="w-full rounded-[28px] border border-white/10 bg-white/5 px-6 py-5 text-left text-lg leading-8 text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:bg-[var(--panel-2)] hover:text-white"
+                            >
+                              {prompt}
+                            </button>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={handleGenerate}
+                          disabled={!text.trim() || isGenerating}
+                          className={cn(
+                            'flex w-full items-center justify-center gap-3 rounded-full px-6 py-4 text-base font-semibold transition',
+                            isGenerating
+                              ? 'cursor-not-allowed bg-white/10 text-[var(--muted)]'
+                              : 'bg-[linear-gradient(135deg,var(--accent),#ffdb78)] text-black shadow-[0_16px_36px_rgba(240,185,96,0.35)] hover:translate-y-[-1px]'
+                          )}
+                        >
+                          {isGenerating ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              正在生成语音
+                            </>
+                          ) : (
+                            <>
+                              <Volume2 className="h-5 w-5" />
+                              立即生成
+                              <span className="rounded-full border border-black/15 bg-black/10 px-3 py-1 text-[11px] font-mono uppercase tracking-[0.22em] text-black/70">
+                                {text.length} chars
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
@@ -663,7 +731,7 @@ export default function App() {
                           Speech To Text
                         </div>
                         <div className="mt-1 text-sm text-[var(--soft)]">
-                          上传音频，使用 {DEFAULT_ASR_MODEL_ID} 直接转写到文本框
+                          上传音频后转写，识别结果会单独显示在这里
                         </div>
                       </div>
                       <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-mono uppercase tracking-[0.22em] text-[var(--soft)]">
@@ -720,75 +788,43 @@ export default function App() {
 
                     {transcriptionResult && (
                       <div className="mt-3 rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-4">
-                        <div className="flex flex-wrap gap-2 text-[11px] text-[var(--soft)]">
-                          {transcriptionResult.language && (
-                            <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
-                              {transcriptionResult.language}
-                            </span>
-                          )}
-                          {transcriptionResult.duration && (
-                            <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
-                              {formatAudioDuration(transcriptionResult.duration)}
-                            </span>
-                          )}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-wrap gap-2 text-[11px] text-[var(--soft)]">
+                            {transcriptionResult.language && (
+                              <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
+                                {transcriptionResult.language}
+                              </span>
+                            )}
+                            {transcriptionResult.duration && (
+                              <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
+                                {formatAudioDuration(transcriptionResult.duration)}
+                              </span>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={handleCopyTranscription}
+                            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:text-white"
+                          >
+                            {transcriptionCopied ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 text-[var(--accent)]" />
+                                已复制
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5" />
+                                复制文本
+                              </>
+                            )}
+                          </button>
                         </div>
+
                         <p className="mt-3 text-sm leading-7 text-white">
                           {transcriptionResult.text}
                         </p>
                       </div>
                     )}
-                  </div>
-
-                  <div className="relative">
-                    <div className="pointer-events-none absolute -inset-px rounded-[30px] bg-[linear-gradient(135deg,rgba(240,185,96,0.35),transparent_40%,rgba(73,128,255,0.2))] opacity-70" />
-                    <div className="relative rounded-[30px] border border-white/10 bg-[rgba(8,11,20,0.92)] p-4 sm:p-5">
-                      <textarea
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        placeholder="输入要合成的文本，例如广告口播、欢迎词、旁白、提醒播报..."
-                        className="h-[320px] w-full resize-none rounded-[24px] border border-white/6 bg-[var(--panel)] px-5 py-5 text-base leading-8 text-white outline-none transition-colors placeholder:text-[var(--muted)] focus:border-[var(--line-strong)] sm:text-lg"
-                      />
-
-                      <div className="mt-4 space-y-4">
-                        <div className="flex flex-col gap-3">
-                          {PROMPT_SUGGESTIONS.map((prompt) => (
-                            <button
-                              key={prompt}
-                              onClick={() => setText(prompt)}
-                              className="w-full rounded-[28px] border border-white/10 bg-white/5 px-6 py-5 text-left text-lg leading-8 text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:bg-[var(--panel-2)] hover:text-white"
-                            >
-                              {prompt}
-                            </button>
-                          ))}
-                        </div>
-
-                        <button
-                          onClick={handleGenerate}
-                          disabled={!text.trim() || isGenerating}
-                          className={cn(
-                            'flex w-full items-center justify-center gap-3 rounded-full px-6 py-4 text-base font-semibold transition',
-                            isGenerating
-                              ? 'cursor-not-allowed bg-white/10 text-[var(--muted)]'
-                              : 'bg-[linear-gradient(135deg,var(--accent),#ffdb78)] text-black shadow-[0_16px_36px_rgba(240,185,96,0.35)] hover:translate-y-[-1px]'
-                          )}
-                        >
-                          {isGenerating ? (
-                            <>
-                              <Loader2 className="h-5 w-5 animate-spin" />
-                              正在生成语音
-                            </>
-                          ) : (
-                            <>
-                              <Volume2 className="h-5 w-5" />
-                              立即生成
-                              <span className="rounded-full border border-black/15 bg-black/10 px-3 py-1 text-[11px] font-mono uppercase tracking-[0.22em] text-black/70">
-                                {text.length} chars
-                              </span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
