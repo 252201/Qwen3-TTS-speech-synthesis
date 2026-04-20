@@ -55,7 +55,7 @@ const DEFAULT_CONFIG: TTSConfig = {
 const PRESET_VOICES = [
   { id: 'vivian', label: 'Vivian', description: '普通女声' },
   { id: 'serena', label: 'Serena', description: '活泼女声' },
-  { id: 'uncle_fu', label: 'Uncle_Fu', description: '醇厚大叔' },
+  { id: 'uncle_fu', label: 'Uncle', description: '醇厚大叔' },
   { id: 'dylan', label: 'Dylan', description: '北京男声' },
   { id: 'eric', label: 'Eric', description: '成都男声' },
   { id: 'ryan', label: 'Ryan', description: '英文男声' },
