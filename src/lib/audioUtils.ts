@@ -46,35 +46,48 @@ async function decodeMediaFileToAudioBuffer(file: File): Promise<AudioBuffer> {
 }
 
 async function extractAudioBufferFromVideo(file: File): Promise<AudioBuffer> {
-  const mimeType = pickRecorderMimeType();
-  if (!mimeType) {
-    throw new Error('当前浏览器不支持从视频中提取音轨，请先导出音频后再上传。');
-  }
-
   const objectUrl = URL.createObjectURL(file);
   const media = document.createElement('video');
   media.preload = 'auto';
   media.playsInline = true;
-  media.muted = true;
-  media.volume = 0;
   media.src = objectUrl;
+  media.crossOrigin = 'anonymous';
 
-  const playbackCtx = new AudioContext();
+  const playbackCtx = new AudioContext({ sampleRate: 24000 });
   const source = playbackCtx.createMediaElementSource(media);
-  const destination = playbackCtx.createMediaStreamDestination();
-  source.connect(destination);
+  const processor = playbackCtx.createScriptProcessor(4096, 2, 2);
+  const zeroGain = playbackCtx.createGain();
+  zeroGain.gain.value = 0;
 
-  const chunks: BlobPart[] = [];
-  const recorder = new MediaRecorder(destination.stream, { mimeType });
+  const channelChunks: Float32Array[][] = [];
+  let channelCount = 0;
+  let totalFrames = 0;
+
+  processor.onaudioprocess = (event) => {
+    const inputBuffer = event.inputBuffer;
+    channelCount = Math.max(channelCount, inputBuffer.numberOfChannels);
+
+    for (let ch = 0; ch < inputBuffer.numberOfChannels; ch++) {
+      if (!channelChunks[ch]) channelChunks[ch] = [];
+      channelChunks[ch].push(new Float32Array(inputBuffer.getChannelData(ch)));
+    }
+
+    totalFrames += inputBuffer.length;
+  };
+
+  source.connect(processor);
+  processor.connect(zeroGain);
+  zeroGain.connect(playbackCtx.destination);
 
   const cleanup = async () => {
-    recorder.ondataavailable = null;
-    recorder.onerror = null;
+    processor.onaudioprocess = null;
     media.onloadedmetadata = null;
     media.onended = null;
     media.onerror = null;
+    media.pause();
     source.disconnect();
-    destination.disconnect();
+    processor.disconnect();
+    zeroGain.disconnect();
     URL.revokeObjectURL(objectUrl);
     if (playbackCtx.state !== 'closed') {
       await playbackCtx.close();
@@ -87,72 +100,39 @@ async function extractAudioBufferFromVideo(file: File): Promise<AudioBuffer> {
       media.onerror = () => reject(new Error('视频加载失败，无法提取音轨。'));
     });
 
-    const recordedBlob = await new Promise<Blob>(async (resolve, reject) => {
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunks.push(event.data);
-      };
-      recorder.onerror = () => reject(new Error('视频音轨提取失败，请改用音频文件上传。'));
-      media.onended = () => recorder.stop();
+    await playbackCtx.resume();
 
-      recorder.start();
+    await new Promise<void>(async (resolve, reject) => {
+      media.onended = () => resolve();
 
       try {
         await media.play();
       } catch (error) {
-        recorder.stop();
         reject(new Error('视频播放失败，无法提取音轨。'));
-        return;
       }
-
-      recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
     });
 
-    const decodeCtx = new AudioContext({ sampleRate: 24000 });
-    try {
-      const arrayBuffer = await recordedBlob.arrayBuffer();
-      return await decodeCtx.decodeAudioData(arrayBuffer.slice(0));
-    } finally {
-      await decodeCtx.close();
+    if (channelCount === 0 || totalFrames === 0) {
+      throw new Error('未能从视频中提取到有效音轨。');
     }
+
+    const outputBuffer = playbackCtx.createBuffer(channelCount, totalFrames, playbackCtx.sampleRate);
+
+    for (let ch = 0; ch < channelCount; ch++) {
+      const outputChannel = outputBuffer.getChannelData(ch);
+      const chunks = channelChunks[ch] || [];
+      let offset = 0;
+
+      for (const chunk of chunks) {
+        outputChannel.set(chunk, offset);
+        offset += chunk.length;
+      }
+    }
+
+    return outputBuffer;
   } finally {
     await cleanup();
   }
-}
-
-function pickRecorderMimeType(): string | null {
-  const applePreferred = [
-    'audio/mp4',
-    'audio/aac',
-    'audio/webm;codecs=opus',
-    'audio/webm'
-  ];
-  const defaultPreferred = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4',
-    'audio/aac'
-  ];
-  const candidates = isAppleWebKitMediaEnvironment() ? applePreferred : defaultPreferred;
-
-  for (const mimeType of candidates) {
-    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mimeType)) {
-      return mimeType;
-    }
-  }
-
-  return null;
-}
-
-function isAppleWebKitMediaEnvironment(): boolean {
-  if (typeof navigator === 'undefined') return false;
-
-  const ua = navigator.userAgent || '';
-  const vendor = navigator.vendor || '';
-  const isIOSDevice = /iPad|iPhone|iPod/.test(ua);
-  const isAppleVendor = /Apple/i.test(vendor);
-  const isWebKitBrowser = /AppleWebKit/i.test(ua);
-
-  return isWebKitBrowser && (isIOSDevice || isAppleVendor);
 }
 
 export interface AudioEndingAnalysis {
