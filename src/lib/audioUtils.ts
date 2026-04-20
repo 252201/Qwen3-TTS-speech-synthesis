@@ -3,10 +3,7 @@
  * This ensures compatibility with omlx's voice cloning backend which expects WAV.
  */
 export async function convertToWav(file: File): Promise<{ wavBlob: Blob; rawBase64: string }> {
-  const arrayBuffer = await file.arrayBuffer();
-  const audioCtx = new AudioContext({ sampleRate: 24000 }); // 24kHz matches TTS models
-  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-  await audioCtx.close();
+  const audioBuffer = await decodeMediaFileToAudioBuffer(file);
 
   // Downmix to mono
   const numSamples = audioBuffer.length;
@@ -27,6 +24,116 @@ export async function convertToWav(file: File): Promise<{ wavBlob: Blob; rawBase
   const base64 = await blobToBase64Raw(wavBlob);
 
   return { wavBlob, rawBase64: base64 };
+}
+
+async function decodeMediaFileToAudioBuffer(file: File): Promise<AudioBuffer> {
+  const audioCtx = new AudioContext({ sampleRate: 24000 });
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const directBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+    await audioCtx.close();
+    return directBuffer;
+  } catch (error) {
+    await audioCtx.close();
+
+    if (!file.type.startsWith('video/')) {
+      throw error;
+    }
+
+    return extractAudioBufferFromVideo(file);
+  }
+}
+
+async function extractAudioBufferFromVideo(file: File): Promise<AudioBuffer> {
+  const mimeType = pickRecorderMimeType();
+  if (!mimeType) {
+    throw new Error('当前浏览器不支持从视频中提取音轨，请先导出音频后再上传。');
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  const media = document.createElement('video');
+  media.preload = 'auto';
+  media.playsInline = true;
+  media.muted = true;
+  media.volume = 0;
+  media.src = objectUrl;
+
+  const playbackCtx = new AudioContext();
+  const source = playbackCtx.createMediaElementSource(media);
+  const destination = playbackCtx.createMediaStreamDestination();
+  source.connect(destination);
+
+  const chunks: BlobPart[] = [];
+  const recorder = new MediaRecorder(destination.stream, { mimeType });
+
+  const cleanup = async () => {
+    recorder.ondataavailable = null;
+    recorder.onerror = null;
+    media.onloadedmetadata = null;
+    media.onended = null;
+    media.onerror = null;
+    source.disconnect();
+    destination.disconnect();
+    URL.revokeObjectURL(objectUrl);
+    if (playbackCtx.state !== 'closed') {
+      await playbackCtx.close();
+    }
+  };
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      media.onloadedmetadata = () => resolve();
+      media.onerror = () => reject(new Error('视频加载失败，无法提取音轨。'));
+    });
+
+    const recordedBlob = await new Promise<Blob>(async (resolve, reject) => {
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onerror = () => reject(new Error('视频音轨提取失败，请改用音频文件上传。'));
+      media.onended = () => recorder.stop();
+
+      recorder.start();
+
+      try {
+        await media.play();
+      } catch (error) {
+        recorder.stop();
+        reject(new Error('视频播放失败，无法提取音轨。'));
+        return;
+      }
+
+      recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+    });
+
+    const decodeCtx = new AudioContext({ sampleRate: 24000 });
+    try {
+      const arrayBuffer = await recordedBlob.arrayBuffer();
+      return await decodeCtx.decodeAudioData(arrayBuffer.slice(0));
+    } finally {
+      await decodeCtx.close();
+    }
+  } finally {
+    await cleanup();
+  }
+}
+
+function pickRecorderMimeType(): string | null {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/aac'
+  ];
+
+  for (const mimeType of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mimeType)) {
+      return mimeType;
+    }
+  }
+
+  return null;
 }
 
 export interface AudioEndingAnalysis {

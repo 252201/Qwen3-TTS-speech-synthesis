@@ -362,7 +362,7 @@ export default function App() {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('音频文件不能超过 5MB');
+      alert('媒体文件不能超过 5MB');
       return;
     }
 
@@ -407,7 +407,7 @@ export default function App() {
       }
     } catch (err) {
       console.error('Audio conversion failed:', err);
-      alert('音频文件解码失败，请尝试使用 WAV 格式的音频文件。');
+      alert('媒体文件解码失败，请尝试使用 WAV / MP3 / MP4 / MOV 等浏览器支持的格式。');
     }
   };
 
@@ -811,9 +811,9 @@ export default function App() {
                     <input
                       ref={transcriptionInputRef}
                       type="file"
-                      accept="audio/*"
-                      onChange={handleTranscriptionFileChange}
-                      className="hidden"
+                        accept="audio/*,video/*"
+                        onChange={handleTranscriptionFileChange}
+                        className="hidden"
                     />
 
                     {transcriptionFile && (
@@ -1145,14 +1145,14 @@ export default function App() {
                           <Upload className="h-5 w-5 text-[var(--accent)]" />
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-white">上传参考音频</div>
-                          <p className="mt-1 text-xs leading-5 text-[var(--soft)]">支持 WAV / MP3，文件不超过 5MB</p>
+                          <div className="text-sm font-medium text-white">上传参考媒体</div>
+                          <p className="mt-1 text-xs leading-5 text-[var(--soft)]">支持 WAV / MP3 / MP4 / MOV，文件不超过 5MB</p>
                         </div>
                       </button>
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept="audio/*"
+                        accept="audio/*,video/*"
                         onChange={handleFileUpload}
                         className="hidden"
                       />
