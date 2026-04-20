@@ -36,6 +36,7 @@ import { TTSConfig, TTSHistoryItem } from './types';
 const DEFAULT_MODEL_FAMILY = '1.7B';
 const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit';
 const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-Base-8bit';
+const DEFAULT_ASR_MODEL_ID = 'Qwen3-ASR-1.7B-8bit';
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_REMOTE_API_HOST = 'https://api.252202.xyz/v1/audio/speech';
 const LEGACY_LOCAL_OMLX_API_HOST = 'http://127.0.0.1:4321/v1/audio/speech';
@@ -124,6 +125,16 @@ function getModelsEndpoint(apiHost: string) {
   }
 }
 
+function getTranscriptionsEndpoint(apiHost: string) {
+  try {
+    const url = new URL(apiHost);
+    url.pathname = url.pathname.replace(/\/audio\/speech\/?$/, '/audio/transcriptions');
+    return url.toString();
+  } catch {
+    return apiHost.replace(/\/audio\/speech\/?$/, '/audio/transcriptions');
+  }
+}
+
 async function playCompletionChime() {
   const AudioContextCtor = window.AudioContext || (window as typeof window & {
     webkitAudioContext?: typeof AudioContext;
@@ -169,13 +180,21 @@ async function playCompletionChime() {
 export default function App() {
   const [text, setText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [history, setHistory] = useState<TTSHistoryItem[]>([]);
   const [config, setConfig] = useState<TTSConfig>(DEFAULT_CONFIG);
   const [availableModelIds, setAvailableModelIds] = useState<string[]>([]);
   const [currentAudio, setCurrentAudio] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [transcriptionFile, setTranscriptionFile] = useState<File | null>(null);
+  const [transcriptionResult, setTranscriptionResult] = useState<{
+    text: string;
+    language?: string;
+    duration?: number;
+  } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const transcriptionInputRef = useRef<HTMLInputElement>(null);
   const configLoaded = useRef(false);
   const currentModelFamily = DEFAULT_MODEL_FAMILY;
 
@@ -375,6 +394,64 @@ export default function App() {
       modelId: presetModel
     }));
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleTranscriptionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setTranscriptionFile(file);
+    setTranscriptionResult(null);
+  };
+
+  const handleTranscribeAudio = async () => {
+    if (!transcriptionFile || isTranscribing) return;
+
+    setIsTranscribing(true);
+    try {
+      const formData = new FormData();
+      formData.append('model', DEFAULT_ASR_MODEL_ID);
+      formData.append('file', transcriptionFile);
+
+      const response = await fetch(getTranscriptionsEndpoint(config.apiHost), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = '语音转文本失败';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error?.message || errorData.message || errorMessage;
+        } catch (e) {
+          errorMessage = `HTTP 错误 ${response.status}: ${errorText.slice(0, 100) || response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const payload = await response.json();
+      const transcript = typeof payload?.text === 'string' ? payload.text.trim() : '';
+
+      if (!transcript) {
+        throw new Error('接口未返回可用的转写文本');
+      }
+
+      setTranscriptionResult({
+        text: transcript,
+        language: typeof payload?.language === 'string' ? payload.language : undefined,
+        duration: typeof payload?.duration === 'number' ? payload.duration : undefined
+      });
+      setText(transcript);
+    } catch (error) {
+      console.error('Transcription error:', error);
+      alert(error instanceof Error ? error.message : '语音转文本失败');
+    } finally {
+      setIsTranscribing(false);
+    }
   };
 
   const handleGenerate = async () => {
@@ -577,6 +654,89 @@ export default function App() {
                       </div>
                       <h2 className="text-2xl font-semibold text-white sm:text-3xl">文本输入与实时生成</h2>
                     </div>
+                  </div>
+
+                  <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
+                          Speech To Text
+                        </div>
+                        <div className="mt-1 text-sm text-[var(--soft)]">
+                          上传音频，使用 {DEFAULT_ASR_MODEL_ID} 直接转写到文本框
+                        </div>
+                      </div>
+                      <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-mono uppercase tracking-[0.22em] text-[var(--soft)]">
+                        ASR 1.7B
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                      <button
+                        onClick={() => transcriptionInputRef.current?.click()}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:text-white"
+                      >
+                        <Upload className="h-4.5 w-4.5 text-[var(--accent)]" />
+                        {transcriptionFile ? '更换音频' : '上传待转写音频'}
+                      </button>
+
+                      <button
+                        onClick={handleTranscribeAudio}
+                        disabled={!transcriptionFile || isTranscribing}
+                        className={cn(
+                          'inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition',
+                          !transcriptionFile || isTranscribing
+                            ? 'cursor-not-allowed border border-white/10 bg-white/5 text-[var(--muted)]'
+                            : 'border border-[var(--line-strong)] bg-[var(--panel-2)] text-white hover:bg-white/10'
+                        )}
+                      >
+                        {isTranscribing ? (
+                          <>
+                            <Loader2 className="h-4.5 w-4.5 animate-spin" />
+                            正在转写
+                          </>
+                        ) : (
+                          <>
+                            <Type className="h-4.5 w-4.5" />
+                            语音转文本
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <input
+                      ref={transcriptionInputRef}
+                      type="file"
+                      accept="audio/*"
+                      onChange={handleTranscriptionFileChange}
+                      className="hidden"
+                    />
+
+                    {transcriptionFile && (
+                      <div className="mt-3 rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white">
+                        {transcriptionFile.name}
+                      </div>
+                    )}
+
+                    {transcriptionResult && (
+                      <div className="mt-3 rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-4">
+                        <div className="flex flex-wrap gap-2 text-[11px] text-[var(--soft)]">
+                          {transcriptionResult.language && (
+                            <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
+                              {transcriptionResult.language}
+                            </span>
+                          )}
+                          {transcriptionResult.duration && (
+                            <span className="rounded-full border border-white/8 bg-white/5 px-3 py-1">
+                              {formatAudioDuration(transcriptionResult.duration)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-3 text-sm leading-7 text-white">
+                          {transcriptionResult.text}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="relative">
