@@ -580,9 +580,6 @@ export default function App() {
                         Script Editor
                       </div>
                       <h2 className="text-2xl font-semibold text-white sm:text-3xl">文本输入与实时生成</h2>
-                      <p className="max-w-2xl text-sm leading-7 text-[var(--soft)]">
-                        左边专注写稿，右边只保留关键信息卡。操作路径更短，也更适合边测试边改口播文案。
-                      </p>
                     </div>
                   </div>
 
