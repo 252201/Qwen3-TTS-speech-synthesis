@@ -120,12 +120,19 @@ async function extractAudioBufferFromVideo(file: File): Promise<AudioBuffer> {
 }
 
 function pickRecorderMimeType(): string | null {
-  const candidates = [
+  const applePreferred = [
+    'audio/mp4',
+    'audio/aac',
+    'audio/webm;codecs=opus',
+    'audio/webm'
+  ];
+  const defaultPreferred = [
     'audio/webm;codecs=opus',
     'audio/webm',
     'audio/mp4',
     'audio/aac'
   ];
+  const candidates = isAppleWebKitMediaEnvironment() ? applePreferred : defaultPreferred;
 
   for (const mimeType of candidates) {
     if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mimeType)) {
@@ -134,6 +141,18 @@ function pickRecorderMimeType(): string | null {
   }
 
   return null;
+}
+
+function isAppleWebKitMediaEnvironment(): boolean {
+  if (typeof navigator === 'undefined') return false;
+
+  const ua = navigator.userAgent || '';
+  const vendor = navigator.vendor || '';
+  const isIOSDevice = /iPad|iPhone|iPod/.test(ua);
+  const isAppleVendor = /Apple/i.test(vendor);
+  const isWebKitBrowser = /AppleWebKit/i.test(ua);
+
+  return isWebKitBrowser && (isIOSDevice || isAppleVendor);
 }
 
 export interface AudioEndingAnalysis {
