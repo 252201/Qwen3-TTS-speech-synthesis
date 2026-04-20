@@ -6,7 +6,7 @@ export interface TTSHistoryItem {
   durationSeconds?: number;
   model: string;
   voice: string;
-  seed: number;
+  seed?: number;
   responseFormat?: string;
   gain?: number;
   instruct?: string;
@@ -18,7 +18,6 @@ export interface TTSConfig {
   apiHost: string;
   modelId: string;
   voice: string;
-  seed: number;
   instruct?: string;
   responseFormat: string;
   gain: number; // Output audio gain applied to the generated file before saving

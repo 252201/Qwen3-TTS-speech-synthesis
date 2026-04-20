@@ -45,7 +45,6 @@ const DEFAULT_CONFIG: TTSConfig = {
   apiHost: import.meta.env.VITE_TTS_API_HOST || DEFAULT_REMOTE_API_HOST,
   modelId: normalizeModelId(import.meta.env.VITE_TTS_MODEL_ID) || DEFAULT_MODEL_ID,
   voice: 'vivian',
-  seed: 42,
   responseFormat: 'wav',
   gain: 1.0
 };
@@ -401,7 +400,6 @@ export default function App() {
         model: config.modelId,
         input: text,
         voice: config.voice === 'custom' ? 'alloy' : config.voice,
-        seed: config.seed,
         max_tokens: DEFAULT_MAX_TOKENS,
         instructions: activeInstructions,
         response_format: config.responseFormat
@@ -457,7 +455,6 @@ export default function App() {
         durationSeconds: audioAnalysis?.duration,
         model: config.modelId,
         voice: config.voice === 'custom' ? `克隆: ${config.referenceAudioName}` : config.voice,
-        seed: config.seed,
         responseFormat,
         gain: config.gain,
         instruct: activeInstructions,
@@ -527,7 +524,6 @@ export default function App() {
     ? 0
     : Math.min(100, (trimmedTextLength / 1000) * 100);
   const isCurrentCompatHost = /api\.252202\.xyz/i.test(config.apiHost);
-  const seedIsExperimental = isCurrentCompatHost;
   const referenceTextRequired = isCloneMode && isCurrentCompatHost;
   const cardClass =
     'rounded-[28px] border border-white/10 bg-white/6 shadow-[0_24px_80px_rgba(8,10,20,0.45)] backdrop-blur-xl';
@@ -760,9 +756,6 @@ export default function App() {
                               <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] text-[var(--soft)]">
                                 <Type className="h-3.5 w-3.5" />
                                 {itemVoice}
-                              </span>
-                              <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] text-[var(--soft)]">
-                                种子 {item.seed === -1 ? '随机' : item.seed}
                               </span>
                               {itemEmotion && (
                                 <span className="inline-flex items-center gap-1 rounded-full border border-[var(--line-strong)] bg-[var(--accent)]/12 px-3 py-1 text-[11px] text-[var(--accent)]">
@@ -1047,33 +1040,6 @@ export default function App() {
                       <span>3.0x</span>
                     </div>
                   </div>
-                </div>
-
-                <div className="space-y-3 rounded-[24px] border border-white/10 bg-black/20 p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <label className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">随机种子</label>
-                    <button
-                      onClick={() => setConfig(prev => ({ ...prev, seed: Math.floor(Math.random() * 2147483647) }))}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[var(--soft)] transition hover:border-[var(--line-strong)] hover:text-white"
-                    >
-                      随机
-                    </button>
-                  </div>
-                  <input
-                    type="number"
-                    value={config.seed === -1 ? '' : config.seed}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value, 10);
-                      setConfig(prev => ({ ...prev, seed: Number.isNaN(value) ? -1 : value }));
-                    }}
-                    placeholder="-1 代表完全随机"
-                    className="w-full rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-3 text-sm text-white outline-none transition focus:border-[var(--line-strong)] placeholder:text-[var(--muted)]"
-                  />
-                  <p className="text-xs leading-6 text-[var(--soft)]">
-                    {seedIsExperimental
-                      ? '当前接口实测并不会严格按 seed 复现结果，所以它只能算实验参数，不能保证每次还是同一个人。'
-                      : '固定种子适合复现同一发声结果，留空或填 `-1` 则每次随机。'}
-                  </p>
                 </div>
 
               </div>
