@@ -195,10 +195,12 @@ export default function App() {
     duration?: number;
   } | null>(null);
   const [transcriptionCopied, setTranscriptionCopied] = useState(false);
+  const [isReferenceTextAutofilling, setIsReferenceTextAutofilling] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const transcriptionInputRef = useRef<HTMLInputElement>(null);
   const configLoaded = useRef(false);
+  const referenceTranscriptionTokenRef = useRef(0);
   const currentModelFamily = DEFAULT_MODEL_FAMILY;
 
   useEffect(() => {
@@ -368,15 +370,41 @@ export default function App() {
       const { wavBlob, rawBase64 } = await convertToWav(file);
       const previewUrl = URL.createObjectURL(wavBlob);
       const cloneModel = getPreferredModelId(availableModelIds, currentModelFamily, 'Base');
+      const requestToken = referenceTranscriptionTokenRef.current + 1;
+      referenceTranscriptionTokenRef.current = requestToken;
+
       setConfig(prev => ({
         ...prev,
         referenceAudio: previewUrl,
         referenceAudioRaw: rawBase64,
         referenceAudioName: file.name,
+        referenceText: '',
         instruct: '',
         voice: 'custom',
         modelId: cloneModel
       }));
+
+      setIsReferenceTextAutofilling(true);
+
+      try {
+        const transcript = await transcribeAudioFile(file);
+        if (referenceTranscriptionTokenRef.current !== requestToken) return;
+
+        setConfig(prev => (
+          prev.referenceAudioRaw
+            ? { ...prev, referenceText: transcript.text }
+            : prev
+        ));
+      } catch (error) {
+        console.error('Reference audio transcription failed:', error);
+        if (referenceTranscriptionTokenRef.current === requestToken) {
+          alert(error instanceof Error ? `参考音频已上传，但自动转写失败：${error.message}` : '参考音频已上传，但自动转写失败，请手动填写参考音频文本。');
+        }
+      } finally {
+        if (referenceTranscriptionTokenRef.current === requestToken) {
+          setIsReferenceTextAutofilling(false);
+        }
+      }
     } catch (err) {
       console.error('Audio conversion failed:', err);
       alert('音频文件解码失败，请尝试使用 WAV 格式的音频文件。');
@@ -384,6 +412,9 @@ export default function App() {
   };
 
   const clearReferenceAudio = () => {
+    referenceTranscriptionTokenRef.current += 1;
+    setIsReferenceTextAutofilling(false);
+
     const presetModel =
       getPreferredModelId(availableModelIds, currentModelFamily, 'CustomVoice');
 
@@ -397,6 +428,45 @@ export default function App() {
       modelId: presetModel
     }));
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const transcribeAudioFile = async (file: File) => {
+    const formData = new FormData();
+    formData.append('model', DEFAULT_ASR_MODEL_ID);
+    formData.append('file', file);
+
+    const response = await fetch(getTranscriptionsEndpoint(config.apiHost), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = '语音转文本失败';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error?.message || errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = `HTTP 错误 ${response.status}: ${errorText.slice(0, 100) || response.statusText}`;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const payload = await response.json();
+    const transcript = typeof payload?.text === 'string' ? payload.text.trim() : '';
+
+    if (!transcript) {
+      throw new Error('接口未返回可用的转写文本');
+    }
+
+    return {
+      text: transcript,
+      language: typeof payload?.language === 'string' ? payload.language : undefined,
+      duration: typeof payload?.duration === 'number' ? payload.duration : undefined
+    };
   };
 
   const handleTranscriptionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -413,42 +483,8 @@ export default function App() {
 
     setIsTranscribing(true);
     try {
-      const formData = new FormData();
-      formData.append('model', DEFAULT_ASR_MODEL_ID);
-      formData.append('file', transcriptionFile);
-
-      const response = await fetch(getTranscriptionsEndpoint(config.apiHost), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${config.apiKey}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = '语音转文本失败';
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error?.message || errorData.message || errorMessage;
-        } catch (e) {
-          errorMessage = `HTTP 错误 ${response.status}: ${errorText.slice(0, 100) || response.statusText}`;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const payload = await response.json();
-      const transcript = typeof payload?.text === 'string' ? payload.text.trim() : '';
-
-      if (!transcript) {
-        throw new Error('接口未返回可用的转写文本');
-      }
-
-      setTranscriptionResult({
-        text: transcript,
-        language: typeof payload?.language === 'string' ? payload.language : undefined,
-        duration: typeof payload?.duration === 'number' ? payload.duration : undefined
-      });
+      const result = await transcribeAudioFile(transcriptionFile);
+      setTranscriptionResult(result);
     } catch (error) {
       console.error('Transcription error:', error);
       alert(error instanceof Error ? error.message : '语音转文本失败');
@@ -1076,6 +1112,11 @@ export default function App() {
                           <span className="text-[var(--accent)]">
                             {referenceTextRequired ? '当前接口必填' : '建议填写'}
                           </span>
+                          {isReferenceTextAutofilling && (
+                            <span className="ml-2 text-[var(--soft)]">
+                              正在自动识别...
+                            </span>
+                          )}
                         </label>
                         <textarea
                           value={config.referenceText || ''}
