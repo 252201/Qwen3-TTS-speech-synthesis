@@ -14,8 +14,6 @@ export interface TTSHistoryItem {
 }
 
 export interface TTSConfig {
-  apiKey: string;
-  apiHost: string;
   modelId: string;
   voice: string;
   instruct?: string;

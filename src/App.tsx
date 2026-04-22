@@ -40,12 +40,11 @@ const DEFAULT_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit';
 const DEFAULT_CLONE_MODEL_ID = 'Qwen3-TTS-12Hz-1.7B-Base-8bit';
 const DEFAULT_ASR_MODEL_ID = 'Qwen3-ASR-1.7B-8bit';
 const DEFAULT_MAX_TOKENS = 4096;
-const DEFAULT_REMOTE_API_HOST = 'https://api.252202.xyz/v1/audio/speech';
-const LEGACY_LOCAL_OMLX_API_HOST = 'http://127.0.0.1:4321/v1/audio/speech';
+const TTS_PROXY_ENDPOINT = '/api/tts';
+const ASR_PROXY_ENDPOINT = '/api/asr';
+const MODELS_PROXY_ENDPOINT = '/api/models';
 
 const DEFAULT_CONFIG: TTSConfig = {
-  apiKey: import.meta.env.VITE_TTS_API_KEY || 'omlx-mpi54dic99snaxxp',
-  apiHost: import.meta.env.VITE_TTS_API_HOST || DEFAULT_REMOTE_API_HOST,
   modelId: normalizeModelId(import.meta.env.VITE_TTS_MODEL_ID) || DEFAULT_MODEL_ID,
   voice: 'vivian',
   responseFormat: 'wav',
@@ -115,26 +114,6 @@ function getPreferredModelId(
     availableModelIds.find(id => id.includes(kind)) ||
     fallbackDefault
   );
-}
-
-function getModelsEndpoint(apiHost: string) {
-  try {
-    const url = new URL(apiHost);
-    url.pathname = url.pathname.replace(/\/audio\/speech\/?$/, '/models');
-    return url.toString();
-  } catch {
-    return apiHost.replace(/\/audio\/speech\/?$/, '/models');
-  }
-}
-
-function getTranscriptionsEndpoint(apiHost: string) {
-  try {
-    const url = new URL(apiHost);
-    url.pathname = url.pathname.replace(/\/audio\/speech\/?$/, '/audio/transcriptions');
-    return url.toString();
-  } catch {
-    return apiHost.replace(/\/audio\/speech\/?$/, '/audio/transcriptions');
-  }
 }
 
 async function playCompletionChime() {
@@ -208,14 +187,16 @@ export default function App() {
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
-        const { speed: _legacySpeed, ...rest } = parsed;
+        const {
+          apiKey: _legacyApiKey,
+          apiHost: _legacyApiHost,
+          speed: _legacySpeed,
+          ...rest
+        } = parsed;
         setConfig(prev => ({
           ...prev,
           ...rest,
-          modelId: normalizeModelId(rest.modelId),
-          apiHost: !rest.apiHost || rest.apiHost === LEGACY_LOCAL_OMLX_API_HOST
-            ? DEFAULT_CONFIG.apiHost
-            : rest.apiHost
+          modelId: normalizeModelId(rest.modelId)
         }));
       } catch (e) {
         console.error('Failed to parse config', e);
@@ -255,7 +236,15 @@ export default function App() {
 
   useEffect(() => {
     if (!configLoaded.current) return;
-    const { referenceAudio, referenceAudioRaw, referenceText, speed: _legacySpeed, ...saveableConfig } = config as TTSConfig & { speed?: number };
+    const {
+      apiKey: _legacyApiKey,
+      apiHost: _legacyApiHost,
+      referenceAudio,
+      referenceAudioRaw,
+      referenceText,
+      speed: _legacySpeed,
+      ...saveableConfig
+    } = config as TTSConfig & { apiKey?: string; apiHost?: string; speed?: number };
     localStorage.setItem('tts_config', JSON.stringify(saveableConfig));
   }, [config]);
 
@@ -272,11 +261,7 @@ export default function App() {
 
     const loadAvailableModels = async () => {
       try {
-        const response = await fetch(getModelsEndpoint(config.apiHost), {
-          headers: {
-            Authorization: `Bearer ${config.apiKey}`
-          }
-        });
+        const response = await fetch(MODELS_PROXY_ENDPOINT);
 
         if (!response.ok) return;
 
@@ -315,7 +300,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [config.apiHost, config.apiKey, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
+  }, [config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
 
   useEffect(() => {
     if (!config.instruct?.trim()) return;
@@ -435,11 +420,8 @@ export default function App() {
     formData.append('model', DEFAULT_ASR_MODEL_ID);
     formData.append('file', file);
 
-    const response = await fetch(getTranscriptionsEndpoint(config.apiHost), {
+    const response = await fetch(ASR_PROXY_ENDPOINT, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`
-      },
       body: formData
     });
 
@@ -511,8 +493,7 @@ export default function App() {
 
     const requiresReferenceText =
       config.voice === 'custom' &&
-      !!config.referenceAudioRaw &&
-      /api\.252202\.xyz/i.test(config.apiHost);
+      !!config.referenceAudioRaw;
 
     if (requiresReferenceText && !config.referenceText?.trim()) {
       alert('当前接口要求填写参考音频文本（ref_text），请填写参考音频中实际说的内容。');
@@ -541,11 +522,10 @@ export default function App() {
         }
       }
 
-      const response = await fetch(config.apiHost, {
+      const response = await fetch(TTS_PROXY_ENDPOINT, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.apiKey}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(body)
       });
@@ -652,8 +632,7 @@ export default function App() {
   const progressWidth = trimmedTextLength === 0
     ? 0
     : Math.min(100, (trimmedTextLength / 1000) * 100);
-  const isCurrentCompatHost = /api\.252202\.xyz/i.test(config.apiHost);
-  const referenceTextRequired = isCloneMode && isCurrentCompatHost;
+  const referenceTextRequired = isCloneMode;
   const cardClass =
     'rounded-[28px] border border-white/10 bg-white/6 shadow-[0_24px_80px_rgba(8,10,20,0.45)] backdrop-blur-xl';
 
