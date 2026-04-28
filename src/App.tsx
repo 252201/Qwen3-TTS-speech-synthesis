@@ -43,7 +43,6 @@ const DEFAULT_ASR_MODEL_ID = 'Qwen3-ASR-1.7B-8bit';
 const DEFAULT_MAX_TOKENS = 4096;
 const TTS_PROXY_ENDPOINT = '/api/tts';
 const ASR_PROXY_ENDPOINT = '/api/asr';
-const MODELS_PROXY_ENDPOINT = '/api/models';
 const SESSION_ENDPOINT = '/api/session';
 
 const DEFAULT_CONFIG: TTSConfig = {
@@ -78,6 +77,7 @@ const MODEL_PRESETS = [
   { id: 'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit', label: '1.7B-CustomVoice', note: '预设音色推荐' },
   { id: 'Qwen3-TTS-12Hz-1.7B-Base-8bit', label: '1.7B-Base', note: '语音克隆推荐' },
 ];
+const AVAILABLE_MODEL_IDS = MODEL_PRESETS.map(model => model.id);
 
 const PROMPT_SUGGESTIONS = [
   '欢迎来到今天的节目，我们将用两分钟快速了解这项新技术。',
@@ -170,7 +170,6 @@ export default function App() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [history, setHistory] = useState<TTSHistoryItem[]>([]);
   const [config, setConfig] = useState<TTSConfig>(DEFAULT_CONFIG);
-  const [availableModelIds, setAvailableModelIds] = useState<string[]>([]);
   const [currentAudio, setCurrentAudio] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [transcriptionFile, setTranscriptionFile] = useState<File | null>(null);
@@ -285,97 +284,44 @@ export default function App() {
   }, [config.gain]);
 
   useEffect(() => {
-    if (accessStatus !== 'granted') return;
-
-    let cancelled = false;
-
-    const loadAvailableModels = async () => {
-      try {
-        const response = await fetch(MODELS_PROXY_ENDPOINT);
-
-        if (response.status === 401) {
-          setAccessStatus('locked');
-          return;
-        }
-
-        if (!response.ok) return;
-
-        const payload = await response.json();
-        const models = Array.isArray(payload?.data)
-          ? payload.data.map((item: { id?: string }) => item.id).filter((id: string | undefined): id is string => !!id)
-          : [];
-        const supportedModels = models.filter(id => id.includes(DEFAULT_MODEL_FAMILY));
-
-        if (cancelled || supportedModels.length === 0) return;
-
-        setAvailableModelIds(supportedModels);
-
-        if (!supportedModels.includes(config.modelId)) {
-          const preferredModel = getPreferredModelId(
-            supportedModels,
-            currentModelFamily,
-            config.voice === 'custom' && config.referenceAudioRaw ? 'Base' : 'CustomVoice'
-          );
-
-          if (preferredModel) {
-            setConfig(prev => (
-              supportedModels.includes(prev.modelId)
-                ? prev
-                : { ...prev, modelId: preferredModel }
-            ));
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load available models', error);
-      }
-    };
-
-    loadAvailableModels();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [accessStatus, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
-
-  useEffect(() => {
     if (!config.instruct?.trim()) return;
     if (config.voice === 'custom' && config.referenceAudioRaw) return;
     if (config.modelId.includes('CustomVoice')) return;
 
-    const preferredEmotionModel = getPreferredModelId(availableModelIds, currentModelFamily, 'CustomVoice');
+    const preferredEmotionModel = getPreferredModelId(AVAILABLE_MODEL_IDS, currentModelFamily, 'CustomVoice');
 
     setConfig(prev => (
       (prev.voice === 'custom' && prev.referenceAudioRaw) || prev.modelId.includes('CustomVoice')
         ? prev
         : { ...prev, modelId: preferredEmotionModel }
     ));
-  }, [availableModelIds, config.instruct, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
+  }, [config.instruct, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
 
   useEffect(() => {
     if (!(config.voice === 'custom' && config.referenceAudioRaw)) return;
     if (config.modelId.includes('Base')) return;
 
-    const preferredCloneModel = getPreferredModelId(availableModelIds, currentModelFamily, 'Base');
+    const preferredCloneModel = getPreferredModelId(AVAILABLE_MODEL_IDS, currentModelFamily, 'Base');
 
     setConfig(prev => (
       prev.voice === 'custom' && prev.referenceAudioRaw && !prev.modelId.includes('Base')
         ? { ...prev, modelId: preferredCloneModel }
         : prev
     ));
-  }, [availableModelIds, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
+  }, [config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
 
   useEffect(() => {
     if (config.voice === 'custom' && config.referenceAudioRaw) return;
     if (config.modelId.includes('CustomVoice')) return;
 
-    const preferredPresetModel = getPreferredModelId(availableModelIds, currentModelFamily, 'CustomVoice');
+    const preferredPresetModel = getPreferredModelId(AVAILABLE_MODEL_IDS, currentModelFamily, 'CustomVoice');
 
     setConfig(prev => (
       prev.voice !== 'custom' && !prev.referenceAudioRaw && !prev.modelId.includes('CustomVoice')
         ? { ...prev, modelId: preferredPresetModel }
         : prev
     ));
-  }, [availableModelIds, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
+  }, [config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -389,7 +335,7 @@ export default function App() {
     try {
       const { wavBlob, rawBase64 } = await convertToWav(file);
       const previewUrl = URL.createObjectURL(wavBlob);
-      const cloneModel = getPreferredModelId(availableModelIds, currentModelFamily, 'Base');
+      const cloneModel = getPreferredModelId(AVAILABLE_MODEL_IDS, currentModelFamily, 'Base');
       const requestToken = referenceTranscriptionTokenRef.current + 1;
       referenceTranscriptionTokenRef.current = requestToken;
 
@@ -436,7 +382,7 @@ export default function App() {
     setIsReferenceTextAutofilling(false);
 
     const presetModel =
-      getPreferredModelId(availableModelIds, currentModelFamily, 'CustomVoice');
+      getPreferredModelId(AVAILABLE_MODEL_IDS, currentModelFamily, 'CustomVoice');
 
     setConfig(prev => ({
       ...prev,
@@ -1297,7 +1243,7 @@ export default function App() {
                         onClick={() => setConfig(prev => ({
                           ...prev,
                           voice: voice.id,
-                          modelId: getPreferredModelId(availableModelIds, DEFAULT_MODEL_FAMILY, 'CustomVoice')
+                          modelId: getPreferredModelId(AVAILABLE_MODEL_IDS, DEFAULT_MODEL_FAMILY, 'CustomVoice')
                         }))}
                         className={cn(
                           'rounded-2xl border px-3 py-3 text-left transition',
@@ -1343,7 +1289,7 @@ export default function App() {
                           instruct: preset.val,
                           modelId: prev.modelId.includes('CustomVoice')
                             ? prev.modelId
-                            : getPreferredModelId(availableModelIds, DEFAULT_MODEL_FAMILY, 'CustomVoice')
+                            : getPreferredModelId(AVAILABLE_MODEL_IDS, DEFAULT_MODEL_FAMILY, 'CustomVoice')
                         }))}
                         className={cn(
                           'rounded-2xl border px-3 py-3 text-left transition',
@@ -1368,7 +1314,7 @@ export default function App() {
                       ...prev,
                       instruct: e.target.value,
                       modelId: e.target.value.trim() && !prev.modelId.includes('CustomVoice')
-                        ? getPreferredModelId(availableModelIds, DEFAULT_MODEL_FAMILY, 'CustomVoice')
+                        ? getPreferredModelId(AVAILABLE_MODEL_IDS, DEFAULT_MODEL_FAMILY, 'CustomVoice')
                         : prev.modelId
                     }))}
                     placeholder={isEmotionLocked ? '克隆模式下已锁定情绪控制' : '或者直接输入英文指令，例如 Speak slowly and warmly...'}

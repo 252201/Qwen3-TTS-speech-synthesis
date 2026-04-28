@@ -2,10 +2,12 @@ import {
   ALLOWED_TTS_MODELS,
   ALLOWED_VOICES,
   clampString,
+  enforceRequestQuota,
   getUpstreamSpeechUrl,
   parseJsonBody,
   readRequestBody,
   requireApiKey,
+  requireBrowserRequest,
   requireSiteSession,
   sendJson
 } from './_shared.js';
@@ -15,6 +17,13 @@ const MAX_INPUT_LENGTH = 1000;
 const MAX_INSTRUCTIONS_LENGTH = 240;
 const MAX_REF_TEXT_LENGTH = 2000;
 const MAX_REF_AUDIO_BASE64_LENGTH = 7 * 1024 * 1024;
+const TTS_QUOTA = {
+  name: 'tts',
+  windowMs: 10 * 60 * 1000,
+  limit: 6,
+  cooldownMs: 15000,
+  maxConcurrent: 1
+};
 
 export const config = {
   api: {
@@ -28,13 +37,23 @@ export default async function handler(req, res) {
     return sendJson(res, 405, { error: { message: 'Method not allowed.' } });
   }
 
-  if (!requireSiteSession(req, res)) return;
+  if (!requireBrowserRequest(req, res)) return;
+
+  const session = requireSiteSession(req, res);
+  if (!session) return;
+
+  const releaseQuota = enforceRequestQuota(req, res, session, TTS_QUOTA);
+  if (!releaseQuota) return;
 
   const apiKey = requireApiKey(res);
-  if (!apiKey) return;
+  if (!apiKey) {
+    releaseQuota();
+    return;
+  }
 
   const contentType = req.headers['content-type'] || '';
   if (!contentType.toLowerCase().includes('application/json')) {
+    releaseQuota();
     return sendJson(res, 415, { error: { message: 'Expected application/json.' } });
   }
 
@@ -62,6 +81,8 @@ export default async function handler(req, res) {
     sendJson(res, error.statusCode || 502, {
       error: { message: error.statusCode ? error.message : 'TTS upstream request failed.' }
     });
+  } finally {
+    releaseQuota();
   }
 }
 

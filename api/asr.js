@@ -1,6 +1,22 @@
-import { ALLOWED_ASR_MODELS, getTranscriptionsUrl, readRequestBody, requireApiKey, requireSiteSession, sendJson } from './_shared.js';
+import {
+  ALLOWED_ASR_MODELS,
+  enforceRequestQuota,
+  getTranscriptionsUrl,
+  readRequestBody,
+  requireApiKey,
+  requireBrowserRequest,
+  requireSiteSession,
+  sendJson
+} from './_shared.js';
 
 const MAX_ASR_UPLOAD_BYTES = 10 * 1024 * 1024;
+const ASR_QUOTA = {
+  name: 'asr',
+  windowMs: 10 * 60 * 1000,
+  limit: 8,
+  cooldownMs: 5000,
+  maxConcurrent: 1
+};
 
 export const config = {
   api: {
@@ -14,13 +30,23 @@ export default async function handler(req, res) {
     return sendJson(res, 405, { error: { message: 'Method not allowed.' } });
   }
 
-  if (!requireSiteSession(req, res)) return;
+  if (!requireBrowserRequest(req, res)) return;
+
+  const session = requireSiteSession(req, res);
+  if (!session) return;
+
+  const releaseQuota = enforceRequestQuota(req, res, session, ASR_QUOTA);
+  if (!releaseQuota) return;
 
   const apiKey = requireApiKey(res);
-  if (!apiKey) return;
+  if (!apiKey) {
+    releaseQuota();
+    return;
+  }
 
   const contentType = req.headers['content-type'] || '';
   if (!contentType.toLowerCase().includes('multipart/form-data')) {
+    releaseQuota();
     return sendJson(res, 415, { error: { message: 'Expected multipart/form-data.' } });
   }
 
@@ -50,6 +76,8 @@ export default async function handler(req, res) {
     sendJson(res, error.statusCode || 502, {
       error: { message: error.statusCode === 413 ? '上传文件过大。' : 'ASR upstream request failed.' }
     });
+  } finally {
+    releaseQuota();
   }
 }
 
