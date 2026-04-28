@@ -1,4 +1,4 @@
-import { ALLOWED_ASR_MODELS, getTranscriptionsUrl, readRequestBody, requireApiKey, sendJson } from './_shared.js';
+import { ALLOWED_ASR_MODELS, getTranscriptionsUrl, readRequestBody, requireApiKey, requireSiteSession, sendJson } from './_shared.js';
 
 const MAX_ASR_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -13,6 +13,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST');
     return sendJson(res, 405, { error: { message: 'Method not allowed.' } });
   }
+
+  if (!requireSiteSession(req, res)) return;
 
   const apiKey = requireApiKey(res);
   if (!apiKey) return;

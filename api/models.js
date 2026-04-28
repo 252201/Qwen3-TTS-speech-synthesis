@@ -1,10 +1,12 @@
-import { getModelsUrl, requireApiKey, sendJson } from './_shared.js';
+import { getModelsUrl, requireApiKey, requireSiteSession, sendJson } from './_shared.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return sendJson(res, 405, { error: { message: 'Method not allowed.' } });
   }
+
+  if (!requireSiteSession(req, res)) return;
 
   const apiKey = requireApiKey(res);
   if (!apiKey) return;

@@ -11,6 +11,7 @@ import {
   Copy,
   Download,
   History,
+  LockKeyhole,
   Loader2,
   Mic2,
   Play,
@@ -43,6 +44,7 @@ const DEFAULT_MAX_TOKENS = 4096;
 const TTS_PROXY_ENDPOINT = '/api/tts';
 const ASR_PROXY_ENDPOINT = '/api/asr';
 const MODELS_PROXY_ENDPOINT = '/api/models';
+const SESSION_ENDPOINT = '/api/session';
 
 const DEFAULT_CONFIG: TTSConfig = {
   modelId: normalizeModelId(import.meta.env.VITE_TTS_MODEL_ID) || DEFAULT_MODEL_ID,
@@ -160,6 +162,10 @@ async function playCompletionChime() {
 
 export default function App() {
   const [text, setText] = useState('');
+  const [accessStatus, setAccessStatus] = useState<'checking' | 'granted' | 'locked'>('checking');
+  const [accessPassword, setAccessPassword] = useState('');
+  const [accessError, setAccessError] = useState('');
+  const [isAccessSubmitting, setIsAccessSubmitting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [history, setHistory] = useState<TTSHistoryItem[]>([]);
@@ -181,6 +187,28 @@ export default function App() {
   const configLoaded = useRef(false);
   const referenceTranscriptionTokenRef = useRef(0);
   const currentModelFamily = DEFAULT_MODEL_FAMILY;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkAccess = async () => {
+      try {
+        const response = await fetch(SESSION_ENDPOINT);
+        const payload = await response.json().catch(() => null);
+        if (cancelled) return;
+        setAccessStatus(payload?.authenticated ? 'granted' : 'locked');
+      } catch (error) {
+        console.error('Failed to check access session', error);
+        if (!cancelled) setAccessStatus('locked');
+      }
+    };
+
+    checkAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const savedConfig = localStorage.getItem('tts_config');
@@ -257,11 +285,18 @@ export default function App() {
   }, [config.gain]);
 
   useEffect(() => {
+    if (accessStatus !== 'granted') return;
+
     let cancelled = false;
 
     const loadAvailableModels = async () => {
       try {
         const response = await fetch(MODELS_PROXY_ENDPOINT);
+
+        if (response.status === 401) {
+          setAccessStatus('locked');
+          return;
+        }
 
         if (!response.ok) return;
 
@@ -300,7 +335,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
+  }, [accessStatus, config.modelId, config.referenceAudioRaw, config.voice, currentModelFamily]);
 
   useEffect(() => {
     if (!config.instruct?.trim()) return;
@@ -426,6 +461,9 @@ export default function App() {
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        setAccessStatus('locked');
+      }
       const errorText = await response.text();
       let errorMessage = '语音转文本失败';
       try {
@@ -472,6 +510,37 @@ export default function App() {
       alert(error instanceof Error ? error.message : '语音转文本失败');
     } finally {
       setIsTranscribing(false);
+    }
+  };
+
+  const handleAccessSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!accessPassword.trim() || isAccessSubmitting) return;
+
+    setIsAccessSubmitting(true);
+    setAccessError('');
+
+    try {
+      const response = await fetch(SESSION_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password: accessPassword })
+      });
+
+      if (!response.ok) {
+        setAccessError('访问口令不正确');
+        return;
+      }
+
+      setAccessPassword('');
+      setAccessStatus('granted');
+    } catch (error) {
+      console.error('Access login failed:', error);
+      setAccessError('验证失败，请稍后重试');
+    } finally {
+      setIsAccessSubmitting(false);
     }
   };
 
@@ -531,6 +600,9 @@ export default function App() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          setAccessStatus('locked');
+        }
         const errorText = await response.text();
         let errorMessage = '合成语音失败';
         try {
@@ -635,6 +707,76 @@ export default function App() {
   const referenceTextRequired = isCloneMode;
   const cardClass =
     'rounded-[28px] border border-white/10 bg-white/6 shadow-[0_24px_80px_rgba(8,10,20,0.45)] backdrop-blur-xl';
+
+  if (accessStatus !== 'granted') {
+    return (
+      <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] selection:bg-[var(--accent)] selection:text-black">
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(240,185,96,0.18),_transparent_32%),radial-gradient(circle_at_80%_10%,_rgba(73,128,255,0.18),_transparent_26%),linear-gradient(180deg,_rgba(14,18,34,0.85),_rgba(7,10,20,1))]" />
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+        </div>
+
+        <main className="relative mx-auto flex min-h-screen w-full max-w-md items-center px-4 py-10">
+          <section className={cn(cardClass, 'w-full p-6 sm:p-7')}>
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl border border-[var(--line-strong)] bg-[var(--panel-2)] p-3">
+                <LockKeyhole className="h-5 w-5 text-[var(--accent)]" />
+              </div>
+              <div>
+                <div className="text-[11px] font-mono uppercase tracking-[0.28em] text-[var(--muted)]">
+                  Private Access
+                </div>
+                <h1 className="mt-1 text-2xl font-semibold text-white">访问验证</h1>
+              </div>
+            </div>
+
+            {accessStatus === 'checking' ? (
+              <div className="mt-8 flex items-center gap-3 text-sm text-[var(--soft)]">
+                <Loader2 className="h-4.5 w-4.5 animate-spin text-[var(--accent)]" />
+                正在检查访问状态
+              </div>
+            ) : (
+              <form onSubmit={handleAccessSubmit} className="mt-8 space-y-4">
+                <input
+                  type="password"
+                  value={accessPassword}
+                  onChange={(event) => setAccessPassword(event.target.value)}
+                  placeholder="输入访问口令"
+                  autoComplete="current-password"
+                  className="w-full rounded-2xl border border-white/10 bg-[var(--panel)] px-4 py-4 text-base text-white outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--line-strong)]"
+                />
+                {accessError && (
+                  <p className="text-sm text-red-300">{accessError}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={!accessPassword.trim() || isAccessSubmitting}
+                  className={cn(
+                    'flex w-full items-center justify-center gap-3 rounded-full px-6 py-4 text-base font-semibold transition',
+                    !accessPassword.trim() || isAccessSubmitting
+                      ? 'cursor-not-allowed bg-white/10 text-[var(--muted)]'
+                      : 'bg-[linear-gradient(135deg,var(--accent),#ffdb78)] text-black shadow-[0_16px_36px_rgba(240,185,96,0.35)] hover:translate-y-[-1px]'
+                  )}
+                >
+                  {isAccessSubmitting ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      正在验证
+                    </>
+                  ) : (
+                    <>
+                      <LockKeyhole className="h-5 w-5" />
+                      进入工作台
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] selection:bg-[var(--accent)] selection:text-black">

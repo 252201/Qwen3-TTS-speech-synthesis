@@ -1,4 +1,8 @@
+import crypto from 'node:crypto';
+
 const DEFAULT_UPSTREAM_SPEECH_URL = 'https://api.252202.xyz/v1/audio/speech';
+const ACCESS_COOKIE_NAME = 'qwen3_access';
+const ACCESS_SESSION_TTL_SECONDS = 12 * 60 * 60;
 
 export const ALLOWED_TTS_MODELS = new Set([
   'Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit',
@@ -51,6 +55,58 @@ export function requireApiKey(res) {
     return null;
   }
   return apiKey;
+}
+
+export function requireSiteSession(req, res) {
+  const password = process.env.SITE_ACCESS_PASSWORD;
+  const secret = process.env.SESSION_SECRET;
+
+  if (!password || !secret) {
+    sendJson(res, 500, { error: { message: 'Server access gate is not configured.' } });
+    return false;
+  }
+
+  const token = parseCookies(req.headers.cookie || '')[ACCESS_COOKIE_NAME];
+  if (verifyAccessToken(token, secret)) return true;
+
+  sendJson(res, 401, { error: { message: 'Authentication required.' } });
+  return false;
+}
+
+export function isValidAccessPassword(value) {
+  const expected = process.env.SITE_ACCESS_PASSWORD;
+  if (!expected || typeof value !== 'string') return false;
+
+  return timingSafeEqualString(value, expected);
+}
+
+export function createAccessCookie() {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) return null;
+
+  const expiresAt = Math.floor(Date.now() / 1000) + ACCESS_SESSION_TTL_SECONDS;
+  const signature = signAccessValue(String(expiresAt), secret);
+  const token = `${expiresAt}.${signature}`;
+
+  return [
+    `${ACCESS_COOKIE_NAME}=${token}`,
+    'HttpOnly',
+    'Secure',
+    'SameSite=Strict',
+    'Path=/',
+    `Max-Age=${ACCESS_SESSION_TTL_SECONDS}`
+  ].join('; ');
+}
+
+export function clearAccessCookie() {
+  return `${ACCESS_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`;
+}
+
+export function hasValidAccessCookie(req) {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) return false;
+  const token = parseCookies(req.headers.cookie || '')[ACCESS_COOKIE_NAME];
+  return verifyAccessToken(token, secret);
 }
 
 export async function readRequestBody(req, limitBytes) {
@@ -106,4 +162,44 @@ export function parseJsonBody(buffer) {
 export function clampString(value, maxLength) {
   if (typeof value !== 'string') return '';
   return value.trim().slice(0, maxLength);
+}
+
+function verifyAccessToken(token, secret) {
+  if (typeof token !== 'string') return false;
+
+  const [expiresAtRaw, signature] = token.split('.');
+  const expiresAt = Number(expiresAtRaw);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000)) {
+    return false;
+  }
+
+  return timingSafeEqualString(signature, signAccessValue(expiresAtRaw, secret));
+}
+
+function signAccessValue(value, secret) {
+  return crypto.createHmac('sha256', secret).update(value).digest('base64url');
+}
+
+function timingSafeEqualString(actual = '', expected = '') {
+  const actualBuffer = Buffer.from(String(actual));
+  const expectedBuffer = Buffer.from(String(expected));
+
+  if (actualBuffer.length !== expectedBuffer.length) return false;
+  return crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function parseCookies(cookieHeader) {
+  return cookieHeader
+    .split(';')
+    .map(cookie => cookie.trim())
+    .filter(Boolean)
+    .reduce((cookies, cookie) => {
+      const separatorIndex = cookie.indexOf('=');
+      if (separatorIndex === -1) return cookies;
+
+      const name = cookie.slice(0, separatorIndex);
+      const value = cookie.slice(separatorIndex + 1);
+      cookies[name] = value;
+      return cookies;
+    }, {});
 }
